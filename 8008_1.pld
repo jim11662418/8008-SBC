@@ -1,0 +1,77 @@
+Name 8008SBC_1;
+Partno G22V10#1;
+Revision;
+Date 01/06/2021;
+Designer Jim Loos;
+Company ;
+Location ;
+Assembly 8008 SBC;
+Device G22V10;
+
+/****************************************************************/
+/*                                                              */
+/* Bus control logic for 8008 computer                          */
+/*                                                              */
+/****************************************************************/
+
+/* Inputs:                                                      */
+Pin 1 = S0;
+Pin 2 = S1;
+Pin 3 = S2;
+Pin 4 = SYNC;
+Pin 5 = CC1;
+Pin 6 = CC2;
+Pin 7 = FF_CLK;
+Pin 8 = FF_Q;  
+Pin 9 = FF_QNOT;
+
+/* Outputs:                                                     */
+Pin 23 = ST3;
+Pin 22 = ALL;
+Pin 21 = ALH;
+Pin 20 = MEMRD;
+Pin 19 = MEMWR;
+Pin 18 = IORD;
+Pin 17 = IOWR;
+Pin 16 = PHASE1;
+Pin 15 = PHASE2;
+Pin 14 = DBD;
+
+/*  just a reminder for me (Jim)... */
+/*  ! = NOT                         */
+/*  & = AND                         */
+/*  # = OR                          */
+/*  $ = XOR                         */
+
+/* Internal Logic:                                              */
+/* states */
+t1      = !S0 &  S1 & !S2;
+t1i     = !S0 &  S1 &  S2;
+t2      = !S0 & !S1 &  S2;
+wait    = !S0 & !S1 & !S2;
+t3      =  S0 & !S1 & !S2;
+stopped =  S0 &  S1 & !S2;
+t4      =  S0 &  S1 &  S2;
+t5      =  S0 & !S1 &  S2;
+
+/* cycle types... */
+pci = !CC1 & !CC2;            /* Memory Read Instruction */
+pcr = !CC1 &  CC2;            /* Memory Read Additional */
+pcc =  CC1 & !CC2;            /* I/O Operation */
+pcw =  CC1 &  CC2;            /* Memory Write */
+
+/* Output Logic */
+PHASE1 = !FF_CLK & !FF_Q;                       /* Phase 1 clock to 8008 pin 15         */
+PHASE2 = !FF_CLK & !FF_QNOT;                    /* Pahse 2 clock to 8008 pin 16         */
+
+DBD = (t1 # t1i # t2 # t3) & !SYNC;             /* 74LS245 Data bus direction control   */
+ALL  = (t1 # t1i) & !SYNC & PHASE2;             /* 74LS273 #1 Low Address Latch         */
+ALH  = t2 & !SYNC & PHASE2;                     /* 74LS273 #2 High Address Latch        */
+
+MEMRD = t3 & (pci # pcr) & SYNC;                /* Memory Read to G22V10 #2             */
+MEMWR = t3 & pcw & !SYNC & PHASE2;              /* Memory Write to G22V10 #2            */
+
+IORD  = t3 & pcc & SYNC;                        /* IO Read to G22V10 #2                 */
+IOWR = t3 & pcc & !SYNC & PHASE1;               /* IO Write to G22V10 #2                */
+
+ST3 = t3 & PHASE2 & !SYNC;                      /* clock interrupt control flip-flop    */ 
