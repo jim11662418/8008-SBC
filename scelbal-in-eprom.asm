@@ -5,7 +5,7 @@
 ; Scelbi Basic Interpreter (SCELBAL) modified for ROM.
 ;
 ; SCELBAL interpreter downloaded from http://www.willegal.net/scelbi/scelbal.html modified
-; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Åke.
+; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Ã…ke.
 ;
 ; modified to run in a 2764 EPROM for my 8008 home-brew single board computer by Jim Loos.
 ;------------------------------------------------------------------------            
@@ -217,10 +217,10 @@ delay:      inr b
 ;;; the code being switched to these labels, but they
 ;;; seem to be.
 	
-OLDPG1		EQU	2000H             ; originally at 0100H, now relocated to 2000H - jsl  
-OLDPG26	    EQU	2100H             ; originally at 1600H, now relocated to 2100H - jsl 
-OLDPG27	    EQU	2200H             ; originally at 1700H, now relocated to 2200H - jsl 
-OLDPG57	    EQU	2300H             ; originally at 2F00H, now relocated to 2300H - jsl
+OLDPG1	    EQU	2000H             ; originally at 0100H (page 1 in octal),  now relocated to 2000H - jsl  
+OLDPG26	    EQU	2100H             ; originally at 1600H (page 26 in octal), now relocated to 2100H - jsl 
+OLDPG27	    EQU	2200H             ; originally at 1700H (page 27 in octal), now relocated to 2200H - jsl 
+OLDPG57	    EQU	2300H             ; originally at 2F00H (pahe 57 in octal), now relocated to 2300H - jsl
 
 BGNPGRAM    EQU 24H               ; originally user program buffer began at 1B00H, now begins at 2400H - jsl
 ENDPGRAM    EQU 40H               ; originally user program buffer ended at 2CFFH, now ends at 3FFFH   - jsl  
