@@ -217,7 +217,7 @@ delay:      inr b
 ;;; the code being switched to these labels, but they
 ;;; seem to be.
 	
-OLDPG1	    EQU	2000H             ; originally at 0100H (page 1 in octal),  now relocated to 2000H - jsl  
+OLDPG1	    EQU	2000H             ; originally at 0100H (page 01 in octal), now relocated to 2000H - jsl  
 OLDPG26	    EQU	2100H             ; originally at 1600H (page 26 in octal), now relocated to 2100H - jsl 
 OLDPG27	    EQU	2200H             ; originally at 1700H (page 27 in octal), now relocated to 2200H - jsl 
 OLDPG57	    EQU	2300H             ; originally at 2F00H (pahe 57 in octal), now relocated to 2300H - jsl
