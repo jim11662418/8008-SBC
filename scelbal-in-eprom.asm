@@ -64,7 +64,8 @@ mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page
 ; "... the I/O routines themselves may only utilize a maximum of two levels of nesting!"
 ;-----------------------------------------------------------------------------------------
 ; 2400 bps character input subroutine for SCELBAL
-; wait for a character from the serial port. echo the character. return the character in A.
+; uses bit 0 of input port 0 for serial input.
+; waits for a character from the serial port. echos the character. returns the character in A.
 ; uses A and B.
 ;-----------------------------------------------------------------------------------------
 CINP:       in 0                    ; get input from serial port
@@ -117,6 +118,7 @@ getbit:     mov a,b                 ; save B in A
             
 ;------------------------------------------------------------------------        
 ; 2400 bps character output subroutine for SCELBAL
+; uses bit 0 of output port 8 for serial output.
 ; uses A and B.
 ;------------------------------------------------------------------------
 CPRINT:     ani 7fh                 ; clear the most signficant bit
@@ -220,7 +222,7 @@ delay:      inr b
 OLDPG1	    EQU	2000H             ; originally at 0100H (page 01 in octal), now relocated to 2000H - jsl  
 OLDPG26	    EQU	2100H             ; originally at 1600H (page 26 in octal), now relocated to 2100H - jsl 
 OLDPG27	    EQU	2200H             ; originally at 1700H (page 27 in octal), now relocated to 2200H - jsl 
-OLDPG57	    EQU	2300H             ; originally at 2F00H (pahe 57 in octal), now relocated to 2300H - jsl
+OLDPG57	    EQU	2300H             ; originally at 2F00H (page 57 in octal), now relocated to 2300H - jsl
 
 BGNPGRAM    EQU 24H               ; originally user program buffer began at 1B00H, now begins at 2400H - jsl
 ENDPGRAM    EQU 40H               ; originally user program buffer ended at 2CFFH, now ends at 3FFFH   - jsl  
@@ -3831,7 +3833,7 @@ UDEFX:	   HLT
 save:	
 load:	   JMP EXEC		            ; By default, save and load isn't implemented.
 
-;this page gets copied from EPROM to RAM at 2000H as OLDPG1           
+;this page gets copied from EPROM to RAM at 2000H as OLDPG1 - jsl           
             ORG 1D00H
 page1:      DB 000,000,000,000
             DB 000,000,100,001	        ; STORES FLOATING POINT CONSTANT +1.0
@@ -3936,7 +3938,7 @@ page1:      DB 000,000,000,000
             DB 'E'+200
             DB ' '+200        
             
-;this page gets copied from EPROM to RAM at 2100H as OLDPG26            
+;this page gets copied from EPROM to RAM at 2100H as OLDPG26 - jsl            
            ORG 1E00H
 page26:    DB 000			    ; CC FOR INPUT LINE BUFFER
            DB 117 dup 0 		; 79 Bytes THE INPUT LINE BUFFER
@@ -4054,7 +4056,7 @@ page26:    DB 000			    ; CC FOR INPUT LINE BUFFER
 	       DB 000		        ; TABLE COUNTER (370)
            db 0,0,0,0,0,0,0
            
-;this page gets copied from EPROM to RAM at 2200H as OLDPG27           
+;this page gets copied from EPROM to RAM at 2200H as OLDPG27 - jsl           
 	       ORG 1F00H
 page27:    DB 3
 	       DB 'R'+200
