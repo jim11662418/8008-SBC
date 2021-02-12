@@ -22,7 +22,7 @@
             org 00h
             rst 1                   ; jumps to 0008h
 
-            org 08h			        ; rst 1 jumps here
+            org 08h		    ; rst 1 jumps here
 start:      mvi a,1
             out 8                   ; set serial output high (mark)
             xra a
@@ -70,7 +70,7 @@ mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page
 ;-----------------------------------------------------------------------------------------
 CINP:       in 0                    ; get input from serial port
             rar                     ; rotate the received serial bit right into carry
-            jc CINP                 ; jump if start bit detected
+            jc CINP                 ; jump if start bit not detected
 
             ; start bit detected. wait 52 cycles (1/2 bit time) then send start bit
             mvi b,0                 ; initialize B
