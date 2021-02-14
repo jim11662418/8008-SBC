@@ -62,7 +62,7 @@ pcw =  CC1 &  CC2;            /* Memory Write */
 
 /* Output Logic */
 PHASE1 = !FF_CLK & !FF_Q;                       /* Phase 1 clock to 8008 pin 15         */
-PHASE2 = !FF_CLK & !FF_QNOT;                    /* Pahse 2 clock to 8008 pin 16         */
+PHASE2 = !FF_CLK & !FF_QNOT;                    /* Phase 2 clock to 8008 pin 16         */
 
 DBD = (t1 # t1i # t2 # t3) & !SYNC;             /* 74LS245 Data bus direction control   */
 ALL  = (t1 # t1i) & !SYNC & PHASE2;             /* 74LS273 #1 Low Address Latch         */
