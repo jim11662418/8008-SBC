@@ -5,9 +5,9 @@
 ; Scelbi Basic Interpreter (SCELBAL) modified for ROM.
 ;
 ; SCELBAL interpreter downloaded from http://www.willegal.net/scelbi/scelbal.html modified
-; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Ã…ke.
+; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Åke.
 ;
-; modified to run in a 2764 EPROM for my 8008 home-brew single board computer by Jim Loos.
+; modified to run from a 2764 EPROM for my 8008 home-brew single board computer by Jim Loos.
 ;------------------------------------------------------------------------            
             
             include "bitfuncs.inc" 
@@ -22,13 +22,13 @@
             org 00h
             rst 1                   ; jumps to 0008h
 
-            org 08h		    ; rst 1 jumps here
+            org 08h			        ; rst 1 jumps here
 start:      mvi a,1
             out 8                   ; set serial output high (mark)
             xra a
             out 9                   ; turn off the red LED
             
-; copy OLDPG1 constants from EPROM at 1D00H to RAM at 2000H
+; copy OLDPG1 constants and variables from EPROM at 1D00H to RAM at 2000H
             mvi l,00h               ; initialize L to start of page
 mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 1DH
             mov a,m                 ; retrieve the byte from EPROM
@@ -37,7 +37,7 @@ mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 
             inr l                   ; next address
             jnz mv_oldpg1           ; go back if page not complete
 
-; copy OLDPG26 constants from EPROM at 1E00H to RAM at 2100H            
+; copy OLDPG26 constants and variables from EPROM at 1E00H to RAM at 2100H            
             mvi l,00h               ; initialize L to start of page
 mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page 1EH
             mov a,m                 ; retrieve the byte from EPROM
@@ -46,7 +46,7 @@ mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page
             inr l                   ; next address
             jnz mv_oldpg26          ; go back if page not complete
             
-; copy OLDPG27 constants from EPROM at 1F00H to RAM at 2200H            
+; copy OLDPG27 constants and variables from EPROM at 1F00H to RAM at 2200H            
             mvi l,00h               ; initialize L to start of page
 mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page 1FH
             mov a,m                 ; retrieve the byte from EPROM
@@ -59,18 +59,19 @@ mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page
             
 ;-----------------------------------------------------------------------------------------       
 ; I/O routines for SCELBAL.
-; According to the SECBAL Manual: "Only CPU register B and the accumulator may be used by the I/O routines.
+; According to the SCELBAL Manual: "Only CPU register B and the accumulator may be used by the I/O routines.
 ; All the other CPU registers must contain their original values when I/O operations have been completed."       
 ; "... the I/O routines themselves may only utilize a maximum of two levels of nesting!"
+; Although the manual doesn't mention it, SCELBAL also assumes that the CPRINT subroutine preserves
+; the character in the accumulator.
 ;-----------------------------------------------------------------------------------------
 ; 2400 bps character input subroutine for SCELBAL
-; uses bit 0 of input port 0 for serial input.
-; waits for a character from the serial port. echos the character. returns the character in A.
+; wait for a character from the serial port. echo the character. return the character in A.
 ; uses A and B.
 ;-----------------------------------------------------------------------------------------
 CINP:       in 0                    ; get input from serial port
             rar                     ; rotate the received serial bit right into carry
-            jc CINP                 ; jump if start bit not detected
+            jc CINP                 ; jump if start bit detected
 
             ; start bit detected. wait 52 cycles (1/2 bit time) then send start bit
             mvi b,0                 ; initialize B
@@ -118,7 +119,6 @@ getbit:     mov a,b                 ; save B in A
             
 ;------------------------------------------------------------------------        
 ; 2400 bps character output subroutine for SCELBAL
-; uses bit 0 of output port 8 for serial output.
 ; uses A and B.
 ;------------------------------------------------------------------------
 CPRINT:     ani 7fh                 ; clear the most signficant bit
@@ -140,9 +140,11 @@ CPRINT:     ani 7fh                 ; clear the most signficant bit
             call outbit             ; bit 6
             call outbit             ; bit 7            
 
-            ;send the stop bit 
+            ;send the stop bit
+            mov b,a                 ; save the character in B
             mvi a,1                 ; stop bit
             out 8                   ; send the stop bit 
+            mov a,b                 ; restore the character from B to A
             mvi b,252
             call delay
             ret                     ; return to caller
@@ -219,10 +221,10 @@ delay:      inr b
 ;;; the code being switched to these labels, but they
 ;;; seem to be.
 	
-OLDPG1	    EQU	2000H             ; originally at 0100H (page 01 in octal), now relocated to 2000H - jsl  
-OLDPG26	    EQU	2100H             ; originally at 1600H (page 26 in octal), now relocated to 2100H - jsl 
-OLDPG27	    EQU	2200H             ; originally at 1700H (page 27 in octal), now relocated to 2200H - jsl 
-OLDPG57	    EQU	2300H             ; originally at 2F00H (page 57 in octal), now relocated to 2300H - jsl
+OLDPG1		EQU	2000H             ; originally at 0100H, now relocated to 2000H - jsl  
+OLDPG26	    EQU	2100H             ; originally at 1600H, now relocated to 2100H - jsl 
+OLDPG27	    EQU	2200H             ; originally at 1700H, now relocated to 2200H - jsl 
+OLDPG57	    EQU	2300H             ; originally at 2F00H, now relocated to 2300H - jsl
 
 BGNPGRAM    EQU 24H               ; originally user program buffer began at 1B00H, now begins at 2400H - jsl
 ENDPGRAM    EQU 40H               ; originally user program buffer ended at 2CFFH, now ends at 3FFFH   - jsl  
@@ -688,7 +690,7 @@ LOOKUP:    LLI 370                ;Load L with address of LOOK-UP COUNTER
            LMI 000                ;Initialize the counter to zero
            LLI 120                ;Load L with starting address of the SYMBOL BUFFER
            LDI OLDPG27/400        ;** Load D with page of the VARIABLES TABLE
-           LEI 210                ;Load E with start of the VARL433LES TABLE
+           LEI 210                ;Load E with start of the VARLIABLES TABLE
            LAM                    ;Fetch the (cc) for the string in the SYMBOL BUFFER
            CPI 001                ;See if the name length is just one character. If not,
            JFZ LOOKU1             ;Should be two so proceed to look-up routine. Else,
@@ -1082,11 +1084,12 @@ CHRX:      CAL FPFIX              ;Convert contents of FPACC from floating point
            LHI OLDPG26/400        ;** Set H to page of the TAB FLAG
            LMI 377                ;Set TAB FLAG (to inhibit display of FP value)
            RET                    ;Exit to caller.
+           
 TABX:      CAL FPFIX              ;Convert contents of FPACC from floating point to
 TAB1:      LLI 124                ;Fixed point. Load L with address of 1,SW of fixed
            LAM                    ;Value. Fetch this byte into the accumulator.
            LLI 043                ;Load L with address of COLUMN COUNTER
-           SUM                    ;Subtract value in C-OLUMN COUNTER from desired
+           SUM                    ;Subtract value in COLUMN COUNTER from desired
            LLI 177                ;TAB position. Load L with address of the TAB FLAG.
            LHI OLDPG26/400        ;** Set H to page of the TAB FLAG.
            LMI 377                ;Set TAB FLAG (to inhibit display of FP value)
@@ -1096,7 +1099,7 @@ TABC:      LCA                    ;Else, put difference count in register C
            LAI 240                ;Place ASCII code for space in ACC
 TABLOP:    CAL ECHO               ;Display space on output device
            DCC                    ;Decrement displacement counter
-           JFZ TABLOP             ;If have not reached TAB position, continue to space
+           JFZ TABLOP             ;If have not reached TAB position, continue to space           
            RET                    ;Else, return to calling routine.
 
 STOSYM:    LLI 201                ;Load L with address of ARRAY FLAG
@@ -1781,7 +1784,7 @@ PCOMMA:    LLI 000                ;Load L with address of (cc) in line input buf
            LAI 240                ;Load the ACC with the ASCII code for space
 PCOM1:     CAL ECHO               ;Display the space
            DCC                    ;Decrement the loop counter
-           JFZ PCOM1              ;Continue displaying spaces until loop counter is zero
+           JFZ PCOM1              ;Continue displaying spaces until loop counter is zero           
            RET                    ;Then return to calling routine
 LET0:      CAL SAVESY             ;Entry point for IMPLIED LET statement. Save the
            LLI 202                ;Variable (to left of the equal sign). Set L to the SCAN
@@ -2970,6 +2973,7 @@ FPOUT:     LHI OLDPG1/400         ;** Set H to working area for floating point r
            JTS OUTNEG             ;If most significant bit of MSW is a one, have a minus nr.
            LAI 240                ;Else number is positive, set ASCII code for space for a
            JMP AHEAD1             ;Positive number and go display a space
+           
 OUTNEG:    LLI 124                ;If number in FPACC is negative must negate in order
            LBI 003                ;To display. Set pntr to LSW of FPACC & set prec. cntr.
            CAL COMPLM             ;Negate the number in the FPACC to make it positive
@@ -3833,7 +3837,7 @@ UDEFX:	   HLT
 save:	
 load:	   JMP EXEC		            ; By default, save and load isn't implemented.
 
-;this page gets copied from EPROM to RAM at 2000H as OLDPG1 - jsl           
+;this page gets copied from EPROM to RAM at 2000H as OLDPG1           
             ORG 1D00H
 page1:      DB 000,000,000,000
             DB 000,000,100,001	        ; STORES FLOATING POINT CONSTANT +1.0
@@ -3938,7 +3942,7 @@ page1:      DB 000,000,000,000
             DB 'E'+200
             DB ' '+200        
             
-;this page gets copied from EPROM to RAM at 2100H as OLDPG26 - jsl            
+;this page gets copied from EPROM to RAM at 2100H as OLDPG26            
            ORG 1E00H
 page26:    DB 000			    ; CC FOR INPUT LINE BUFFER
            DB 117 dup 0 		; 79 Bytes THE INPUT LINE BUFFER
@@ -4056,7 +4060,7 @@ page26:    DB 000			    ; CC FOR INPUT LINE BUFFER
 	       DB 000		        ; TABLE COUNTER (370)
            db 0,0,0,0,0,0,0
            
-;this page gets copied from EPROM to RAM at 2200H as OLDPG27 - jsl           
+;this page gets copied from EPROM to RAM at 2200H as OLDPG27           
 	       ORG 1F00H
 page27:    DB 3
 	       DB 'R'+200
@@ -4149,6 +4153,6 @@ page27:    DB 3
 	       DB 000		        ; USED AS VARIABLES SYMBOL TABLE
 	       DB 167 dup 0	        ; 119 Bytes (SHOULD BE 211-377 RESERVED)
            
-           radix 10
-           cpu 8008new         ; new 8008 mnemonics           
+           radix 10             ; return to using base 10
+           cpu 8008new          ; return to using new 8008 mnemonics           
         
