@@ -1086,7 +1086,7 @@ CHRX:      CAL FPFIX              ;Convert contents of FPACC from floating point
            RET                    ;Exit to caller.
            
 TABX:      CAL FPFIX              ;Convert contents of FPACC from floating point to
-TAB1:      LLI 124                ;Fixed point. Load L with address of 1,SW of fixed
+TAB1:      LLI 124                ;Fixed point. Load L with address of LSW of fixed
            LAM                    ;Value. Fetch this byte into the accumulator.
            LLI 043                ;Load L with address of COLUMN COUNTER
            SUM                    ;Subtract value in COLUMN COUNTER from desired
@@ -3831,8 +3831,23 @@ DIMERR:    LAI 304                ;On error condition, load ASCII code for lette
            LCI 305                ;And ASCII code for letter E in CPU register C
            JMP ERROR              ;Go display the Dirnension Error (DE) message.
 
-;;; no user defined functions yet, stop here if we see one.
-UDEFX:	   HLT
+; user defined functions:
+; UDF is a math function like: INT, SGN, ABS, SQR, TAB, RND or CHR;
+; therefore, the syntax is:
+; A=UDF(1) turns the red LED on
+; A=UDF(0) turns the red LED off
+
+           cpu 8008new             ; use "new" 8008 mnemonics
+           radix 10                ; use base 10 for numbers
+
+UDEFX:	   call FPFIX             ; convert the contents of FPACC from floating point to fixed point  
+           mvi l,54h              ; load L with the address of the LSW of the fixed point value  
+           mov a,m                ; fetch the byte into the accumulator
+           out 9                  ; odd arguments for UDF turn the red LED on, even arguments turn the red LED off
+           ret
+
+           cpu 8008               ; return to using "old" mneumonics
+           RADIX 8                ; return to using octal for numbers
 
 save:	
 load:	   JMP EXEC		            ; By default, save and load isn't implemented.
