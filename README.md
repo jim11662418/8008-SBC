@@ -10,10 +10,10 @@ Home-brew Intel 8008 single board computer with SCELBAL BASIC interpreter in EPR
 <p align="center"><img src="/images/8008 SBC Schematic-3.png"/>
 <p align="center">8008 SBC Memory Schematic</p><br>
 <p align="center"><img src="/images/8008 SBC Schematic-4.png"/>
-<p align="center">4008 SBC Clock and Reset Schematic</p><br>
+<p align="center">8008 SBC G22V10 #1 Schematic</p><br>
 <p align="center"><img src="/images/8008 SBC Schematic-5.png"/>
-<p align="center">4008 SBC Clock and Reset Schematic</p><br>
+<p align="center">8008 SBC G22V10 #2 Schematic</p><br>
 <p align="center"><img src="/images/8008 SBC Schematic-6.png"/>
-<p align="center">4008 SBC Clock and Reset Schematic</p><br>
+<p align="center">8008 SBC I/O Schematic</p><br>
 <p align="center"><img src="/images/8008 SBC Schematic-7.png"/>
-<p align="center">4008 SBC Clock and Reset Schematic</p><br>
+<p align="center">8008 SBC Vcc and Gnd Connections</p><br>
