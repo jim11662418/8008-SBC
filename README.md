@@ -3,5 +3,17 @@ Home-brew Intel 8008 single board computer with SCELBAL BASIC interpreter in EPR
 [Intel 8008 Computer Clock](http://www.8008chron.com/) and Jim Kearney's [Tiny 8](https://www.jkearney.com/Tiny8demo/). The SCELBAL BASIC Interpreter can be found at Mike Willegal's [SCELBAL BASIC page](http://www.willegal.net/scelbi/scelbal.html).
 <p align="center"><img src="8008 SBC.JPEG"/>
 <p align="center">Home-brew Intel 8008 SBC</p><br>
-<p align="center"><img src="/images/4004%20SBC%20CPU.png"/>
-<p align="center">4004 SBC CPU and Memory Schematic</p><br>
+<p align="center"><img src="/images/8008 SBC Schematic-1.png"/>
+<p align="center">8008 SBC Clock and Reset Schematic</p><br>
+<p align="center"><img src="/images/8008 SBC Schematic-2.png"/>
+<p align="center">8008 SBC Address and Data Bus Schematic</p><br>
+<p align="center"><img src="/images/8008 SBC Schematic-3.png"/>
+<p align="center">8008 SBC Memory Schematic</p><br>
+<p align="center"><img src="/images/8008 SBC Schematic-4.png"/>
+<p align="center">4008 SBC Clock and Reset Schematic</p><br>
+<p align="center"><img src="/images/8008 SBC Schematic-5.png"/>
+<p align="center">4008 SBC Clock and Reset Schematic</p><br>
+<p align="center"><img src="/images/8008 SBC Schematic-6.png"/>
+<p align="center">4008 SBC Clock and Reset Schematic</p><br>
+<p align="center"><img src="/images/8008 SBC Schematic-7.png"/>
+<p align="center">4008 SBC Clock and Reset Schematic</p><br>
