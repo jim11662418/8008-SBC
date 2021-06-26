@@ -7,7 +7,13 @@
 ; SCELBAL interpreter downloaded from http://www.willegal.net/scelbi/scelbal.html modified
 ; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Åke.
 ;
-; modified to run from a 2764 EPROM for my 8008 home-brew single board computer by Jim Loos.
+; modified to run from a 2764 EPROM for my 8008 home-brew single board computer by Jim Loos.   
+;
+; the user defined function (UDF) is used to control the red LED on the SBC.
+; UDF is a math function like: INT, SGN, ABS, SQR, TAB, RND or CHR;
+; therefore, the syntax is:
+; A=UDF(1) to turn the red LED on
+; A=UDF(0) to turn the red LED off 
 ;------------------------------------------------------------------------            
             
             include "bitfuncs.inc" 
@@ -15,42 +21,49 @@
             cpu 8008new             ; use "new" 8008 mnemonics
             radix 10                ; use base 10 for numbers
 
-; when the reset pushbutton on my 8008 SBC is pressed, the reset flip-flop is set which
-; generates an interrupt and clears the address latches thus, the first instruction is thus
-; always fetched from address 0. the instruction at address 0 must be a single byte transfer
-; instruction in order to set the program counter. i.e., it must be one of the RST opcodes.
-            org 00h
-            rst 1                   ; jumps to 0008h
+; pressing the reset pushbutton on the 8008 SBC sets the reset flip-flop which generates
+; an interrupt and clears the address latches. thus, the first instruction is always fetched
+; from address 0. the instruction at address 0 must be a single byte transfer instruction
+; in order to set the program counter correctly. i.e., it must be one of the RST opcodes.
+            org 2000h               ; beginning of EPROM
+            rst 1
 
-            org 08h			        ; rst 1 jumps here
-start:      mvi a,1
-            out 8                   ; set serial output high (mark)
-            xra a
-            out 9                   ; turn off the red LED
+            org 2008h	            ; rst 1 jumps here
+            jmp start            
             
-; copy OLDPG1 constants and variables from EPROM at 1D00H to RAM at 2000H
+start:      in 1                    ; reset the bootstrap flip-flop internal to GAL22V10 #2
+            mvi a,1
+            out 08h                 ; set serial output high (mark)
+            xra a
+            out 09h                 ; turn off the red LED
+            
+            mvi h,hi(titletxt)      ; print the title
+            mvi l,lo(titletxt) 
+            call puts     
+            
+; copy OLDPG1 constants and variables from EPROM at 1D00H to RAM at 0000H
             mvi l,00h               ; initialize L to start of page
 mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 1DH
             mov a,m                 ; retrieve the byte from EPROM
-            mvi h,hi(OLDPG1)        ; destination: RAM at page 20H
+            mvi h,hi(OLDPG1)        ; destination: RAM at page 00H
             mov m,a                 ; store the byte in RAM
             inr l                   ; next address
             jnz mv_oldpg1           ; go back if page not complete
 
-; copy OLDPG26 constants and variables from EPROM at 1E00H to RAM at 2100H            
+; copy OLDPG26 constants and variables from EPROM at 1E00H to RAM at 0100H            
             mvi l,00h               ; initialize L to start of page
 mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page 1EH
             mov a,m                 ; retrieve the byte from EPROM
-            mvi h,hi(OLDPG26)       ; destination: RAM at page 21H
+            mvi h,hi(OLDPG26)       ; destination: RAM at page 01H
             mov m,a                 ; store the byte in RAM
             inr l                   ; next address
             jnz mv_oldpg26          ; go back if page not complete
             
-; copy OLDPG27 constants and variables from EPROM at 1F00H to RAM at 2200H            
+; copy OLDPG27 constants and variables from EPROM at 1F00H to RAM at 0200H            
             mvi l,00h               ; initialize L to start of page
 mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page 1FH
             mov a,m                 ; retrieve the byte from EPROM
-            mvi h,hi(OLDPG27)       ; destination: RAM at page 22H
+            mvi h,hi(OLDPG27)       ; destination: RAM at page 02H
             mov m,a                 ; store the byte in RAM
             inr l                   ; next address
             jnz mv_oldpg27          ; go back if page not complete
@@ -65,19 +78,22 @@ mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page
 ; Although the manual doesn't mention it, SCELBAL also assumes that the CPRINT subroutine preserves
 ; the character in the accumulator.
 ;-----------------------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------------------
 ; 2400 bps character input subroutine for SCELBAL
-; wait for a character from the serial port. echo the character. return the character in A.
-; uses A and B.
+; wait for a character from the serial port. 
+; echo the character. 
+; return the character in A. uses A and B.
 ;-----------------------------------------------------------------------------------------
 CINP:       in 0                    ; get input from serial port
             rar                     ; rotate the received serial bit right into carry
-            jc CINP                 ; jump if start bit detected
+            jc CINP                 ; jump if start bit not detected
 
             ; start bit detected. wait 52 cycles (1/2 bit time) then send start bit
             mvi b,0                 ; initialize B
             mvi b,0                 ; tweak timing
             xra a                   ; clear the accumulator
-            out 8                   ; send the start bit
+            out 08h                 ; send the start bit
             
             call getbit             ; bit 0
             call getbit             ; bit 1
@@ -89,28 +105,28 @@ CINP:       in 0                    ; get input from serial port
             call getbit             ; bit 7
             
             ; wait 104 cycles, then send the stop bit
-            mov a,b                 ; 5 cycles save the character in A
-            mvi b,252
+            mov a,b                 ; save the character (now in B) in A
+            mvi b,0fch
             call delay
-            mov b,a                 ; retrieve the character from A
+            mov b,a                 ; retrieve the character from A to B
             mvi a,1
-            out 8                   ; send the stop bit
+            out 08h                 ; send the stop bit
             ; wait 104 cycles.
             mov a,b                 ; restore the character to A from B
             ori 80h                 ; set the most significant bit            
-            mvi b,252
-            mvi b,252
+            mvi b,0fch
+            mvi b,0fch
             call delay
             ret                     ; return to caller with the character in A
 
             ; 92 cycles
 getbit:     mov a,b                 ; save B in A
-            mvi b,255
-            mvi b,255
+            mvi b,0ffh
+            mvi b,0ffh
             call delay
             mov b,a                 ; restore B from A
             in 0                    ; get input from the serial port
-            out 8                   ; echo the received bit
+            out 08h                 ; echo the received bit
             rar                     ; rotate the received bit right into carry
             mov a,b                 ; restore the previously received bits
             rar                     ; rotate the newly received bit in carry right into the MSB of A
@@ -125,10 +141,10 @@ CPRINT:     ani 7fh                 ; clear the most signficant bit
             mov b,a                 ; save the character in B
             xra a                   ; clear A for the start bit
 
-            out 8                   ; send the start bit
+            out 08h                 ; send the start bit
             mov a,b                 ; restore the character to A 
             mov a,b                 ; timing adjustment
-            mvi b,252
+            mvi b,0fch
             call delay
             
             call outbit             ; bit 0
@@ -143,14 +159,14 @@ CPRINT:     ani 7fh                 ; clear the most signficant bit
             ;send the stop bit
             mov b,a                 ; save the character in B
             mvi a,1                 ; stop bit
-            out 8                   ; send the stop bit 
+            out 08h                 ; send the stop bit 
             mov a,b                 ; restore the character from B to A
-            mvi b,252
+            mvi b,0fch
             call delay
             ret                     ; return to caller
 
-outbit:     out 8                   ; output the least significant bit
-            mvi b,253
+outbit:     out 08h                 ; output the least significant bit
+            mvi b,0fdh
             call delay
             ana a                   ; timing adjustment
             rrc                     ; shift A right
@@ -160,7 +176,7 @@ delay:      inr b
             jnz delay
             ret                         
 
-            cpu 8008                ; use "old" mneumonics
+            cpu 8008                ; use "old" mneumonics for SCELBAL
             RADIX 8                 ; use octal for numbers
 
 ;--------------------------------------------------------------------------------            
@@ -221,15 +237,15 @@ delay:      inr b
 ;;; the code being switched to these labels, but they
 ;;; seem to be.
 	
-OLDPG1		EQU	2000H             ; originally at 0100H, now relocated to 2000H - jsl  
-OLDPG26	    EQU	2100H             ; originally at 1600H, now relocated to 2100H - jsl 
-OLDPG27	    EQU	2200H             ; originally at 1700H, now relocated to 2200H - jsl 
-OLDPG57	    EQU	2300H             ; originally at 2F00H, now relocated to 2300H - jsl
+OLDPG1		EQU	0000H             ; originally at 0100H, now relocated to 0000H - jsl  
+OLDPG26	    EQU	0100H             ; originally at 1600H, now relocated to 0100H - jsl 
+OLDPG27	    EQU	0200H             ; originally at 1700H, now relocated to 0200H - jsl 
+OLDPG57	    EQU	0300H             ; originally at 2F00H, now relocated to 0300H - jsl
 
-BGNPGRAM    EQU 24H               ; originally user program buffer began at 1B00H, now begins at 2400H - jsl
-ENDPGRAM    EQU 40H               ; originally user program buffer ended at 2CFFH, now ends at 3FFFH   - jsl  
+BGNPGRAM    EQU 04H               ; originally user program buffer began at 1B00H, now begins at 0400H - jsl
+ENDPGRAM    EQU 20H               ; originally user program buffer ended at 2CFFH, now ends at 1FFFH   - jsl  
 
-           ORG 0100H
+           ORG 2100H
 SYNTAX:    CAL CLESYM             ;Clear the SYMBOL BUFFER area
            LLI 340                ;Set L to start of LINE NUMBER BUFFER
            LHI OLDPG26/400        ;** Set H to page of LINE NUMBER BUFFER
@@ -3838,22 +3854,43 @@ DIMERR:    LAI 304                ;On error condition, load ASCII code for lette
 ; A=UDF(0) turns the red LED off
 
            cpu 8008new             ; use "new" 8008 mnemonics
-           radix 10                ; use base 10 for numbers
-
 UDEFX:	   call FPFIX             ; convert the contents of FPACC from floating point to fixed point  
            mvi l,54h              ; load L with the address of the LSW of the fixed point value  
            mov a,m                ; fetch the byte into the accumulator
-           out 9                  ; odd arguments for UDF turn the red LED on, even arguments turn the red LED off
+           out 09h                ; odd arguments for UDF turn the red LED on, even arguments turn the red LED off
            ret
-
            cpu 8008               ; return to using "old" mneumonics
-           RADIX 8                ; return to using octal for numbers
 
 save:	
 load:	   JMP EXEC		            ; By default, save and load isn't implemented.
 
-;this page gets copied from EPROM to RAM at 2000H as OLDPG1           
-            ORG 1D00H
+            cpu 8008new             ; use "new" 8008 mnemonics
+            radix 10                ; use base 10 for numbers
+
+;------------------------------------------------------------------------        
+; serially print the null terminated string whose address is in HL.
+; uses A and B and HL      
+;------------------------------------------------------------------------
+puts:       mov a,m
+            ana a
+            rz                      ; return if end of string
+            call CPRINT
+            inr l                   ; next character
+            jnz puts
+            inr h
+            jmp puts            
+            
+titletxt:   db  "\n\nIntel 8008 Single Board Computer\n"
+            db  "Scelbi BASIC (SCELBAL) Interpreter\n"
+            db  "Assembled on ",DATE," at ",TIME,"\n"
+            db  "Portions copyright 2021 by Jim Loos\n\n"   
+            db  "Type \"SCR\" to clear and initialize program space\n\n",0
+
+            cpu 8008                ; use "old" mneumonics for SCELBAL
+            RADIX 8                 ; use octal for numbers
+
+;this page gets copied from EPROM to RAM at 0000H as OLDPG1           
+            ORG 3D00H
 page1:      DB 000,000,000,000
             DB 000,000,100,001	        ; STORES FLOATING POINT CONSTANT +1.0
             DB 000,000,000
@@ -3957,8 +3994,8 @@ page1:      DB 000,000,000,000
             DB 'E'+200
             DB ' '+200        
             
-;this page gets copied from EPROM to RAM at 2100H as OLDPG26            
-           ORG 1E00H
+;this page gets copied from EPROM to RAM at 0100H as OLDPG26            
+           ORG 3E00H
 page26:    DB 000			    ; CC FOR INPUT LINE BUFFER
            DB 117 dup 0 		; 79 Bytes THE INPUT LINE BUFFER
 	       DB 000,000,000,000	; THESE ARE SYMBOL BUFFER STORAGE
@@ -4075,8 +4112,8 @@ page26:    DB 000			    ; CC FOR INPUT LINE BUFFER
 	       DB 000		        ; TABLE COUNTER (370)
            db 0,0,0,0,0,0,0
            
-;this page gets copied from EPROM to RAM at 2200H as OLDPG27           
-	       ORG 1F00H
+;this page gets copied from EPROM to RAM at 0200H as OLDPG27           
+	       ORG 3F00H
 page27:    DB 3
 	       DB 'R'+200
 	       DB 'E'+200
