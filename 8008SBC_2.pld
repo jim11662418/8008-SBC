@@ -1,0 +1,93 @@
+Name 8008SBC_2;
+Partno G22V10#2;
+Revision;
+Date 01/06/2021;
+Designer Jim Loos;
+Company ;
+Location ;
+Assembly 8008 SBC;
+Device G22V10;
+
+/****************************************************************/
+/*                                                              */
+/* I/O and Memory Addressing                                    */
+/*                                                              */
+/* This version produces the following memory map:              */
+/* 0000H - 1FFFH:  RAM                                          */
+/* 2000H - 3FFFH:  EPROM                                        */
+/****************************************************************/
+
+/* Inputs: */
+Pin 1  = IORD;
+Pin 2  = IOWR;
+Pin 3  = A9;
+Pin 4  = A10;
+Pin 5  = A11;
+Pin 6  = A12;
+Pin 7  = A13;
+Pin 8  = MEMRD;
+Pin 9  = MEMWR;
+Pin 10 = S0;
+pin 11 = S1;
+Pin 13 = S2;
+Pin 18 = Reset;
+
+/* Outputs:  */
+Pin 23 = OUTP0;
+Pin 22 = INP0;
+Pin 21 = OUTP1;
+Pin 20 = INP1;
+Pin 19 = START;
+Pin 17 = ROMCS;
+Pin 16 = RAMCS;
+Pin 15 = RAMWE;
+Pin 14 = RUNNING;
+
+/* Internal Logic: */
+
+/* states */
+t1      = !S0 &  S1 & !S2;
+t1i     = !S0 &  S1 &  S2;
+t2      = !S0 & !S1 &  S2;
+wait    = !S0 & !S1 & !S2;
+t3      =  S0 & !S1 & !S2;
+stopped =  S0 &  S1 & !S2;
+t4      =  S0 &  S1 &  S2;
+t5      =  S0 & !S1 &  S2;
+
+in0  = !A12 & !A13;
+out0 =  A12 & !A13;
+out1 = !A12 &  A13;
+out2 =  A12 &  A13;
+
+device0 = !A9 & !A10 & !A11;
+device1 =  A9 & !A10 & !A11;
+device2 = !A9 &  A10 & !A11;
+device3 =  A9 &  A10 & !A11;
+device4 = !A9 & !A10 &  A11;
+device5 =  A9 & !A10 &  A11;
+device6 = !A9 &  A10 &  A11;
+device7 =  A9 &  A10 &  A11;
+
+/* Output Logic: */
+OUTP0 = out0 & device0 & IOWR;          /* Output port 8        */
+!INP0 = in0  & device0 & IORD;          /* Input port 0         */
+OUTP1 = out0 & device1 & IOWR;          /* Output port 9        */
+!INP1 = in0  & device1 & IORD;          /* Input port 1         */
+OUTP2 = out0 & device2 & IOWR;          /* Output port 10       */
+!INP2 = in0  & device2 & IORD;          /* Input port 2         */
+OUTP3 = out0 & device3 & IOWR;          /* Output port 11       */
+!INP3 = in0  & device3 & IORD;          /* Input port 3         */
+
+/* simulates SR flip-flop made up of cross-connected NAND gates.        */
+/* the flip-flop is set when the reset signal from the DS1233 goes low  */
+/* (power-on-reset) and cleared when input port 1 is accessed. when set,*/
+/* the flip-flop forces all memory accesses to select the EPROM. when   */
+/* reset, the flip-flop permits the normal memory map.                  */
+START = !Reset # (START & INP1);
+
+!ROMCS = MEMRD & (A13 # START);     	    /* 2000-3FFFH           */
+!RAMCS = (MEMRD # MEMWR) & !A13 & !START;  	/* 0000-1FFFH           */
+!RAMWE = MEMWR;
+
+RUNNING = t1 # t1i # t2 # wait # t3 # t4 # t5;
