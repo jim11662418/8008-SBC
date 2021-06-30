@@ -1,7 +1,7 @@
 
 CUPL(WM)        5.0a  Serial# 60008009
 Device          g22v10  Library DLIB-h-40-1
-Created         Sat Jun 26 07:53:09 2021
+Created         Wed Jun 30 02:51:33 2021
 Name            8008SBC_2
 Partno          G22V10#2
 Revision        
@@ -61,4 +61,4 @@ Location
 *L05856 01100011000100110000001000110011
 *L05888 0010
 *C8122
-*AD9C
+*AD85
