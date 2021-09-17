@@ -1,0 +1,80 @@
+Name 8008SBC_2;
+Partno G22V10#2;
+Revision;
+Date 09/17/2021;
+Designer Jim Loos;
+Company ;
+Location ;
+Assembly 8008 SBC;
+Device G22V10;
+
+/* Inputs: */
+Pin 1  = IORD;
+Pin 2  = IOWR;
+Pin 3  = A9;
+Pin 4  = A10;
+Pin 5  = A11;
+Pin 6  = A12;
+Pin 7  = A13;
+Pin 8  = RESET;
+Pin 10 = S0;
+pin 11 = S1;
+Pin 13 = S2;
+
+/* Outputs:  */
+Pin 23 = OUTP0;
+Pin 22 = INP0;
+Pin 21 = OUTP1;
+Pin 20 = INP1;
+Pin 19 = START;
+Pin 17 = ROMCS;
+Pin 16 = RAMCS;
+Pin 14 = RUNNING;
+
+/* states */
+t1      = !S0 &  S1 & !S2;
+t1i     = !S0 &  S1 &  S2;
+t2      = !S0 & !S1 &  S2;
+wait    = !S0 & !S1 & !S2;
+t3      =  S0 & !S1 & !S2;
+stopped =  S0 &  S1 & !S2;
+t4      =  S0 &  S1 &  S2;
+t5      =  S0 & !S1 &  S2;
+
+/* Input/Output logic: */
+in0  = !A13 & !A12;
+out0 = !A13 &  A12;
+out1 =  A13 & !A12;
+out2 =  A13 &  A12;
+
+device0 = !A11 & !A10 & !A9;
+device1 = !A11 & !A10 &  A9;
+device2 = !A11 &  A10 & !A9;
+device3 = !A11 &  A10 &  A9;
+device4 =  A11 & !A10 & !A9;
+device5 =  A11 & !A10 &  A9;
+device6 =  A11 &  A10 & !A9;
+device7 =  A11 &  A10 &  A9;
+
+!INP0 = in0  & device0 & !IORD;          /* Input port 0         */
+!INP1 = in0  & device1 & !IORD;          /* Input port 1         */
+!INP2 = in0  & device2 & !IORD;          /* Input port 2         */
+!INP3 = in0  & device3 & !IORD;          /* Input port 3         */
+OUTP0 = out0 & device0 & !IOWR;          /* Output port 8        */
+OUTP1 = out0 & device1 & !IOWR;          /* Output port 9        */
+OUTP2 = out0 & device2 & !IOWR;          /* Output port 10       */
+OUTP3 = out0 & device3 & !IOWR;          /* Output port 11       */
+
+/* simulated SR flip-flop made up of cross-connected NAND gates.        */
+/* the flip-flop is set when the reset signal from the DS1233 goes low  */
+/* (power-on-reset) and cleared when input port 1 is accessed.          */
+/* when set, the flip-flop forces all memory accesses to select the     */
+/* EPROM. when reset, the flip-flop permits the normal memory map.      */
+START = !RESET # (START & INP1);
+
+/* Memory   */
+!ROMCS =  A13 #  START;     /* 2000-3FFFH           */
+!RAMCS = !A13 & !START;  	/* 0000-1FFFH           */
+
+/* "Running" LED    */
+RUNNING = !stopped;
