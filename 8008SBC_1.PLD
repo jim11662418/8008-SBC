@@ -31,12 +31,6 @@ Pin 16 = PHASE1;
 Pin 15 = PHASE2;
 Pin 14 = DBD;
 
-/*  just a reminder for me (Jim)... */
-/*  ! = NOT                         */
-/*  & = AND                         */
-/*  # = OR                          */
-/*  $ = XOR                         */
-
 /* states */
 t1      = !S2 &  S1 & !S0;
 t1i     =  S2 &  S1 & !S0;
