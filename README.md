@@ -14,6 +14,8 @@ Home-brew Intel 8008 single board computer with SCELBAL BASIC interpreter in EPR
 <p align="center"><img src="/images/8008 SBC Schematic-5.png"/>
 <p align="center">8008 SBC G22V10 #2 Schematic</p><br>
 <p align="center"><img src="/images/8008 SBC Schematic-6.png"/>
-<p align="center">8008 SBC I/O Schematic</p><br>
+<p align="center">8008 SBC Serial I/O Schematic</p><br>
 <p align="center"><img src="/images/8008 SBC Schematic-7.png"/>
+<p align="center">8008 Parallel Output Schematic</p><br>
+<p align="center"><img src="/images/8008 SBC Schematic-8.png"/>
 <p align="center">8008 SBC Vcc and Gnd Connections</p><br>
