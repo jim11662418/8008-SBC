@@ -9,37 +9,45 @@ Assembly 8008 SBC;
 Device G22V10;
 
 /* Inputs: */
-Pin 1 = S0;
-Pin 2 = S1;
-Pin 3 = S2;
-Pin 4 = SYNC;
-Pin 5 = CC1;
-Pin 6 = CC2;
-Pin 7 = FF_CLK;
-Pin 8 = FF_Q;  
-Pin 9 = FF_QNOT;
+Pin 1 = S0;         /* state signal from 8008 pin 13        */
+Pin 2 = S1;         /* state signal from 8008 pin 12        */
+Pin 3 = S2;         /* state signal from 8008 pin 11        */
+Pin 4 = SYNC;       /* SYNC signal from 8008 pin 14         */
+Pin 5 = CC1;        /* control code from 74LS273 #2 pin 5   */
+Pin 6 = CC2;        /* control code from 74LS273 #2 pin 2   */
+Pin 7 = FF_CLK;     /* 1MHz clock to flip-flop              */
+Pin 8 = FF_Q;       /* 500 KHz flip-flop Q                  */
+Pin 9 = FF_QNOT;    /* 500 KHz flip-flop /Q                 */
 
 /* Outputs:   */
-Pin 23 = ST3;
-Pin 22 = ALL;
-Pin 21 = ALH;
-Pin 20 = MEMRD;
-Pin 19 = MEMWR;
-Pin 18 = IORD;
-Pin 17 = IOWR;
-Pin 16 = PHASE1;
-Pin 15 = PHASE2;
-Pin 14 = DBD;
+Pin 23 = RUNNING;   /* Output to "Running" LED              */ 
+Pin 22 = ALL;       /* 74LS273 #1 Address Latch Low strobe  */
+Pin 21 = ALH;       /* 74LS273 #2 Address Latch High strobe */
+Pin 20 = MEMRD;     /* Memory Read strobe to 27256 and 6264 */
+Pin 19 = MEMWR;     /* Memory Write strobe to 6264          */
+Pin 18 = IORD;      /* IO Read to G22V10 #2                 */
+Pin 17 = IOWR;      /* IO Write to G22V10 #2                */
+Pin 16 = PHASE1;    /* Phase 1 clock to 8008 pin 15         */
+Pin 15 = PHASE2;    /* Phase 2 clock to 8008 pin 16         */
+Pin 14 = DBD;       /* 74LS245 Data Bus Direction control   */
+
+/*  just a reminder for me (Jim)... */
+/*  ! = NOT                         */
+/*  & = AND                         */
+/*  # = OR                          */
+/*  $ = XOR                         */
 
 /* states */
-t1      = !S2 &  S1 & !S0;
-t1i     =  S2 &  S1 & !S0;
-t2      =  S2 & !S1 & !S0;
-wait    = !S2 & !S1 & !S0;
-t3      = !S1 & !S1 &  S0;
-stopped = !S2 &  S1 &  S0;
-t4      =  S2 &  S1 &  S0;
-t5      =  S2 & !S1 &  S0;
+t1      = !S2 &  S1 & !S0;      /* lower 8 bits of address out              */
+t1i     =  S2 &  S1 & !S0;      /* CPU interrupted                          */
+t2      =  S2 & !S1 & !S0;      /* higher 6 bits address, 2 bits control out*/    
+wait    = !S2 & !S1 & !S0;      /* external memory not ready                */
+t3      = !S1 & !S1 &  S0;      /* instruction or data fetch or data out    */
+stopped = !S2 &  S1 &  S0;      /* halt instruction received by CPU         */
+t4      =  S2 &  S1 &  S0;      /* execution of instruction                 */
+t5      =  S2 & !S1 &  S0;      /* execution of instruction                 */
+
+!RUNNING = !stopped;
 
 /* cycle types... */
 pci = !CC1 & !CC2;            /* Memory Read Instruction */
@@ -48,19 +56,19 @@ pcc =  CC1 & !CC2;            /* I/O Operation */
 pcw =  CC1 &  CC2;            /* Memory Write */
 
 /* 2 phase clock */
-PHASE1 = !FF_CLK & !FF_Q;                       /* Phase 1 clock to 8008 pin 15         */
-PHASE2 = !FF_CLK & !FF_QNOT;                    /* Phase 2 clock to 8008 pin 16         */
+PHASE1 = !FF_CLK & !FF_Q;
+PHASE2 = !FF_CLK & !FF_QNOT;
 
 /* address and data bus */
-DBD = (t1 # t1i # t2 # t3) & !SYNC;             /* 74LS245 Data Bus Direction control   */
-ALL  = (t1 # t1i) & !SYNC & PHASE2;             /* 74LS273 #1 Address Latch Low         */
-ALH  = t2 & !SYNC & PHASE2;                     /* 74LS273 #2 Address Latch High        */
+DBD = (t1 # t1i # t2 # t3) & !SYNC;
+ALL  = (t1 # t1i) & !SYNC & PHASE2;
+ALH  = t2 & !SYNC & PHASE2;
 
 /* memory and I/O strobes */
-!MEMRD = t3 & (pci # pcr) & SYNC;               /* Memory Read strobe to 27256 and 6264 */
-!MEMWR = t3 & pcw & !SYNC & PHASE2;             /* Memory Write strobe to 6264          */
+!MEMRD = t3 & (pci # pcr) & SYNC;
+!MEMWR = t3 & pcw & !SYNC & PHASE2;
 
-!IORD  = t3 & pcc & SYNC;                       /* IO Read to G22V10 #2                 */
-!IOWR = t3 & pcc & !SYNC & PHASE1;              /* IO Write to G22V10 #2                */
+!IORD  = t3 & pcc & SYNC;
+!IOWR = t3 & pcc & !SYNC & PHASE1;
 
-ST3 = t3 & PHASE2 & !SYNC;                      /* clock interrupt control flip-flop    */ 
+ST3 = t3 & PHASE2 & !SYNC;

@@ -17,9 +17,6 @@ Pin 5  = A11;
 Pin 6  = A12;
 Pin 7  = A13;
 Pin 8  = RESET;
-Pin 10 = S0;
-pin 11 = S1;
-Pin 13 = S2;
 
 /* Outputs:  */
 Pin 23 = OUTP0;
@@ -29,17 +26,6 @@ Pin 20 = INP1;
 Pin 19 = START;
 Pin 17 = ROMCS;
 Pin 16 = RAMCS;
-Pin 14 = RUNNING;
-
-/* states */
-t1      = !S0 &  S1 & !S2;
-t1i     = !S0 &  S1 &  S2;
-t2      = !S0 & !S1 &  S2;
-wait    = !S0 & !S1 & !S2;
-t3      =  S0 & !S1 & !S2;
-stopped =  S0 &  S1 & !S2;
-t4      =  S0 &  S1 &  S2;
-t5      =  S0 & !S1 &  S2;
 
 /* Input/Output logic: */
 in0  = !A13 & !A12;
@@ -75,6 +61,3 @@ START = !RESET # (START & INP1);
 /* Memory   */
 !ROMCS =  A13 #  START;     /* 2000-3FFFH           */
 !RAMCS = !A13 & !START;  	/* 0000-1FFFH           */
-
-/* "Running" LED    */
-RUNNING = !stopped;
