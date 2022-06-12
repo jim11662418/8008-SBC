@@ -5,7 +5,7 @@
 ; Scelbi Basic Interpreter (SCELBAL) modified for ROM.
 ;
 ; SCELBAL interpreter downloaded from http://www.willegal.net/scelbi/scelbal.html modified
-; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Åke.
+; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Ã…ke.
 ;
 ; modified to run from a 2764 EPROM for my 8008 home-brew single board computer by Jim Loos.   
 ;
@@ -41,7 +41,7 @@ start:      in 1                    ; reset the bootstrap flip-flop internal to 
             mvi l,lo(titletxt) 
             call puts     
             
-; copy OLDPG1 constants and variables from EPROM at 1D00H to RAM at 0000H
+; copy OLDPG1 constants and variables from EPROM at 3D00H to RAM at 0000H
             mvi l,00h               ; initialize L to start of page
 mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 1DH
             mov a,m                 ; retrieve the byte from EPROM
@@ -50,7 +50,7 @@ mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 
             inr l                   ; next address
             jnz mv_oldpg1           ; go back if page not complete
 
-; copy OLDPG26 constants and variables from EPROM at 1E00H to RAM at 0100H            
+; copy OLDPG26 constants and variables from EPROM at 3E00H to RAM at 0100H            
             mvi l,00h               ; initialize L to start of page
 mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page 1EH
             mov a,m                 ; retrieve the byte from EPROM
@@ -59,7 +59,7 @@ mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page
             inr l                   ; next address
             jnz mv_oldpg26          ; go back if page not complete
             
-; copy OLDPG27 constants and variables from EPROM at 1F00H to RAM at 0200H            
+; copy OLDPG27 constants and variables from EPROM at 3F00H to RAM at 0200H            
             mvi l,00h               ; initialize L to start of page
 mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page 1FH
             mov a,m                 ; retrieve the byte from EPROM
