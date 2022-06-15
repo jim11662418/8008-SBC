@@ -43,7 +43,7 @@ start:      in 1                    ; reset the bootstrap flip-flop internal to 
             
 ; copy OLDPG1 constants and variables from EPROM at 3D00H to RAM at 0000H
             mvi l,00h               ; initialize L to start of page
-mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 1DH
+mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 3DH
             mov a,m                 ; retrieve the byte from EPROM
             mvi h,hi(OLDPG1)        ; destination: RAM at page 00H
             mov m,a                 ; store the byte in RAM
@@ -52,7 +52,7 @@ mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 
 
 ; copy OLDPG26 constants and variables from EPROM at 3E00H to RAM at 0100H            
             mvi l,00h               ; initialize L to start of page
-mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page 1EH
+mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page 3EH
             mov a,m                 ; retrieve the byte from EPROM
             mvi h,hi(OLDPG26)       ; destination: RAM at page 01H
             mov m,a                 ; store the byte in RAM
@@ -61,7 +61,7 @@ mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page
             
 ; copy OLDPG27 constants and variables from EPROM at 3F00H to RAM at 0200H            
             mvi l,00h               ; initialize L to start of page
-mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page 1FH
+mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page 3FH
             mov a,m                 ; retrieve the byte from EPROM
             mvi h,hi(OLDPG27)       ; destination: RAM at page 02H
             mov m,a                 ; store the byte in RAM
