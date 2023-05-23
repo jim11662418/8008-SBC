@@ -1,2 +1,2 @@
 Visit Mike Willegal's [8008/SCELBI Applications](http://www.willegal.net/scelbi/apps8008.html) page for more information about the applications in this folder. 
-All applications in this folder are assembled using the [Macro Assembler AS](http://john.ccac.rwth-aachen.de:8000/as/).
+Assemble the applications in this folder using the [Macro Assembler AS](http://john.ccac.rwth-aachen.de:8000/as/) and use the Macro Assembler AS p2hex utility to produce Intel HEX object files. On the SBC, remove the jumper connected to the EPROM A14 input to access the monitor. Use the monitor's HEX file download function to load the application's object code. The application should start automatically when the code finishes loading.
