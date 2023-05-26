@@ -2,7 +2,7 @@
 ;;; This is a 1K Floating-Point Concentric Circle Grapher for the 8008
 ;;; written in March 2013 by Mark G. Arnold. 
 ;;; It is intended to be an example for other 1K graphing routines
-;;; (e.g., Mandelbrot>>08H)&0FFH, but this one seems about the easiest
+;;; (e.g., Mandelbrot), but this one seems about the easiest
 ;;; "interesting" picture to generate with FP arithmetic.
  
 ;;; The Floating point routines were taken from
