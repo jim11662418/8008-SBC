@@ -14,7 +14,7 @@
 ;;; MGA gives permission to use SCELBAL for 
 ;;; educational, historical, non-commercial purposes.
 ;;; Versions of this have been circulating on the web since
-;;; about 2000; this version is authorized by MGA (Mar 2012>>08H)&0FFH
+;;; about 2000; this version is authorized by MGA (Mar 2012)
 ;;; with the understanding no warranty is expressed or implied.
 ;;; As stated in the original, "no responsibility is assumed for
 ;;; for inaccuracies or for the success or failure of
