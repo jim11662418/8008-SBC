@@ -63,8 +63,8 @@ OLDPG1:     ORG (0*400)+100
             DB 000,000,000,000
             DB 000,000,000,000
             DB 10 dup (0)		; NOT ASSIGNED (SHOULD BE 01 170-01 177)
-            DB 000,000,000,000	; TEMPORARY REGISTER STORAGE AREA (D,E,H&L>>08H)&0FFH
-            DB 4 dup (0)		; NOT ASSIGNED (01 204-01 207>>08H)&0FFH
+            DB 000,000,000,000	; TEMPORARY REGISTER STORAGE AREA (D,E,H&L)
+            DB 4 dup (0)		; NOT ASSIGNED (01 204-01 207)
             DB 000,000,120,004	; STORES FLOATING POINT CONSTANT +10.0
             DB 147,146,146,375	; STORES FLOATING POINT CONSTANT +0.1
             DB 000		        ; GETINP COUNTER
@@ -76,7 +76,7 @@ Y1:         DB 0,0,0,0
 ;Y:         DB 0,0,0,0
 T:          DB 0,0,0,0
 
-;  these are chosen to make nice picture (esp. for Mandelbrot, but also for circles>>08H)&0FFH
+;  these are chosen to make nice picture (esp. for Mandelbrot, but also for circles)
 STEPY:     DB 147,146,146,375	; STORES FLOATING POINT CONSTANT +0.1
 STEPX:     DB 147,146,146,374	; STORES FLOATING POINT CONSTANT +0.05
 STARTY:    DB 000,000,300,001	; STORES FLOATING POINT CONSTANT -1.0
@@ -90,7 +90,7 @@ CNTY:      DB 000               ;integer controls how many times Y1 loop execute
 ;  FOR Y1=-1 TO 1 STEP 0.1
 ;    PRINT ascii code letter corresponding to row 
 ;    FOR X1=-2.0 TO 1 STEP 0.05
-;     IF floating-point-exponent(X*X+Y*Y>>08H)&0FFH is odd THEN PRINT " ";
+;     IF floating-point-exponent(X*X+Y*Y) is odd THEN PRINT " ";
 ;                                                ELSE PRINT "*";
 ;    NEXT X1
 ;    PRINT
@@ -317,7 +317,7 @@ SHACOP:	   CAL PATCH1		      ; patch 1 inserts a few lines at 30-000
            CAL SHLOOP             ;Rotate FPOP mantissa RIGHT & Increment Exponent
            LDH                    ;Rotate ops provide room for overflow. Now set up
            LEI 123                ;Pointers to LSW minus one for both FPACC & FPOP
-           LBI 004                ;(FPOP already set after SHLOOP>>08H)&0FFH. Set precision counter
+           LBI 004                ;(FPOP already set after SHLOOP). Set precision counter
            CAL ADDER              ;Call quad precision ADDITION subroutine.
            LBI 000                ;Set CPU register B to indicate standard normalization
            JMP FPNORM             ;Go normalize the result and exit to caller.
@@ -389,18 +389,18 @@ SETMCT:    LLI 102                ;Change pointer to bit counter storage locatio
                                   ;back in the FPACC.
 MULTIP:    LLI 126                ;Set pointer to MSW of FPACC mantissa
            LBI 003                ;Set precision counter
-           CAL ROTATR             ;Rotate FPACC (multiplier>>08H)&0FFH RIGHT into carry bit
+           CAL ROTATR             ;Rotate FPACC (multiplier) RIGHT into carry bit
            CTC ADOPPP             ;If carry is a one, add multiplicand to partial-product
            LLI 146                ;Set pointer to partial-product most significant byte
-           LBI 006                ;Set precision counter (p-p register is double length>>08H)&0FFH
+           LBI 006                ;Set precision counter (p-p register is double length)
            CAL ROTATR             ;Shift partial-product RIGHT
            LLI 102                ;Set pointer to bit counter storage location
            LCM                    ;Fetch current value of bit counter
            DCC                    ;Decrement the value of the bit counter
            LMC                    ;Restore the updated bit counter to its storage location
-           JFZ MULTIP             ;If have not multiplied for 23 (deciinal>>08H)&0FFH bits, keep going
-           LLI 146                ;If have done 23 (decimal>>08H)&0FFH bits, set pntr to p-p MSW
-           LBI 006                ;Set precision counter (for double length>>08H)&0FFH
+           JFZ MULTIP             ;If have not multiplied for 23 (deciinal) bits, keep going
+           LLI 146                ;If have done 23 (decimal) bits, set pntr to p-p MSW
+           LBI 006                ;Set precision counter (for double length)
            CAL ROTATR             ;Shift partial-product once more to the RIGHT
            LLI 143                ;Set pointer to access 24'th bit in partial-product
            LAM                    ;Fetch the byte containing the 24'th bit
@@ -432,7 +432,7 @@ EXMLDV:    CAL MOVEIT             ;Perform the transfer from p-p to FPACC
                                   ;this process to indicate whether the final result of the
                                   ;multiplication should be positive or negative. (Negative
                                   ;if original signs of the two numbers to be multiplied are
-                                  ;different.>>08H)&0FFH
+                                  ;different.)
 CKSIGN:    LLI 140                ;Set pointer to start of partial-product working area
            LHI (OLDPG1>>08H)&0FFH ;** Set H to proper page
            LBI 010                ;Set up a loop counter in CPU register B
@@ -480,7 +480,7 @@ NEGFPA:    LLI 101                ;Set pointer to M/D SIGNS indicator
 ADOPPP:    LEI 141                ;Pointer to LSW of partial-product
            LDH                    ;On same page as FPOP
            LLI 131                ;LSIV of FPOP which contains extended multiplicand
-           LBI 006                ;Set precision counter (double length working registers>>08H)&0FFH
+           LBI 006                ;Set precision counter (double length working registers)
            JMP ADDER              ;Add multiplicand to partial-product & return to caller
 
 MROUND:    LBI 003                ;Set up precision counter
@@ -500,24 +500,24 @@ ADDMOR:    LAM                    ;Fetch byte from register group A
            CAL SWITCH             ;Switch memory pointer to register group B
            ACM                    ;Add byte from A to byte from B with carry
            LMA                    ;Leave result in register group B
-           DCB                    ;Decrement number of bytes (precision>>08H)&0FFH counter
+           DCB                    ;Decrement number of bytes (precision) counter
            RTZ                    ;Return to caller when all bytes in group processed
            INL                    ;Else advance pointer for register group B
            CAL SWITCH             ;Switch memory pointer back to register group A
            INL                    ;Advance the pointer for register group A
            JMP ADDMOR             ;Continue the multi-byte addition operation
 
-                                  ;N'th precision two's complement (negate>>08H)&0FFH
+                                  ;N'th precision two's complement (negate)
                                   ;subroutine. Performs a two's complement on the multi-byte
                                   ;registers tarting at the address pointed
-                                  ; to by H & L (least significant byte>>08H)&0FFH upon entry.
+                                  ; to by H & L (least significant byte) upon entry.
 COMPLM:    LAM                    ;Fetch the least significant byte of the number to ACC
            XRI 377                ;Exclusive OR to complement the byte
            ADI 001                ;Add one to form two's complement of byte
 MORCOM:    LMA                    ;Restore the negated byte to memory
            RAR                    ;Save the carry bit
            LDA                    ;In CPU register D
-           DCB                    ;Decrement number of bytes (precision>>08H)&0FFH counter
+           DCB                    ;Decrement number of bytes (precision) counter
            RTZ                    ;Return to caller when all bytes in number processed
            INL                    ;Else advance the pointer
            LAM                    ;Fetch the next byte of the number to ACC
@@ -532,12 +532,12 @@ MORCOM:    LMA                    ;Restore the negated byte to memory
                                   ;N'th precision rotate left subroutine. Rotates a multi-
                                   ;byte number left starting at the address initially
                                   ;specified by the contents of CPU registers H & L upon
-                                  ;subroutine entry (LSW>>08H)&0FFH. First entry point will clear
+                                  ;subroutine entry (LSW). First entry point will clear
                                   ;the carry bit before beginning rotate operations. Second
                                   ;entry point does not clear the carry bit.
 ROTATL:    NDA                    ;Clear the carry bit at this entry point
 ROTL:      LAM                    ;Fetch a byte from memory
-           RAL                    ;Rotate it left (bring carry into LSB, push MSB to carry>>08H)&0FFH
+           RAL                    ;Rotate it left (bring carry into LSB, push MSB to carry)
            LMA                    ;Restore rotated word to memory
            DCB                    ;Decrement precision counter
            RTZ                    ;Exit to caller when finished
@@ -549,7 +549,7 @@ ROTL:      LAM                    ;Fetch a byte from memory
                                   ;above subroutine.
 ROTATR:    NDA                    ;Clear the carry bit at this entry point
 ROTR:      LAM                    ;Fetch a byte from memory
-           RAR                    ;Rotate it right (carry into MSB, LSB to carry>>08H)&0FFH
+           RAR                    ;Rotate it right (carry into MSB, LSB to carry)
            LMA                    ;Restore rotated word to memory
            DCB                    ;Decrement precision counter
            RTZ                    ;Exit to caller when finished
@@ -558,14 +558,14 @@ ROTR:      LAM                    ;Fetch a byte from memory
 
                                   ;N'th precision subtraction subroutine.
                                   ;Number starting at location pointed to by D & E (least
-                                  ;significant byte>>08H)&0FFH is subtracted from number starting at
+                                  ;significant byte) is subtracted from number starting at
                                   ;address specified by contents of H & L.
 SUBBER:    NDA                    ;Initialize the carry bit to zero upon entry
 SUBTRA:    LAM                    ;Fetch byte from register group A
            CAL SWITCH             ;Switch memory pointer to register group B
            SBM                    ;Subtract byte from group B ftom that in group A
            LMA                    ;Leave result in register group B
-           DCB                    ;Decrement number of bytes (precision>>08H)&0FFH counter
+           DCB                    ;Decrement number of bytes (precision) counter
            RTZ                    ;Return to caller when all bytes in group processed
            INL                    ;Else advance pointer for register group B
            CAL SWITCH             ;Switch memory pointer back to register group A
@@ -574,13 +574,13 @@ SUBTRA:    LAM                    ;Fetch byte from register group A
 
                                   ;The next subroutine will transfer the four byte
                                   ;register string (generally a number in floating point
-                                  ;format>>08H)&0FFH from the starting address pointed to by CPU
+                                  ;format) from the starting address pointed to by CPU
                                   ;registers H & L when the subroutine is entered to
-                                  ;the FPACC (floating point accumulator registers>>08H)&0FFH.
+                                  ;the FPACC (floating point accumulator registers).
 FLOAD:     LDI (OLDPG1>>08H)&0FFH ;** Set page address of FPACC
            LEI 124                ;Set address of least signficant byte of FPACC
            LBI 004                ;Set precision counter to four bytes (mantissa bytes
-           JMP MOVEIT             ;Plus Exponent>>08H)&0FFH and exit via the transfer routine
+           JMP MOVEIT             ;Plus Exponent) and exit via the transfer routine
 
                                   ;The next several subroutines are used to perform
                                   ;floating pojnt register loading and transfer operations.
