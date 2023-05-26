@@ -6,7 +6,7 @@
 ;;; "interesting" picture to generate with FP arithmetic.
  
 ;;; The Floating point routines were taken from
-;;; SCELBAL by Mark G. Arnold (MGA>>08H)&0FFH and Nat Wadsworth  
+;;; SCELBAL by Mark G. Arnold (MGA) and Nat Wadsworth  
 ;;;
 ;;;  Copyright 1975 Scelbi Computer Consulting, Inc.
 ;;;  All rights reserved
