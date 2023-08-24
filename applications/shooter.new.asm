@@ -6,6 +6,8 @@
 ; single board computer - jsl 
 ; 
 ; edited to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Jim Loos 05/22/2023 
+;
+; edited to use 'new' Intel 8008 mnemonics by Jim Loos 08/23/2023 
 ; 
 ; serial I/O at 2400 bps N-8-1   
 ; 
