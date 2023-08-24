@@ -12,7 +12,7 @@
 ; Jump to 0000H to start. 
 ;=================================================================================== 
  
-            cpu 8008new          ; use "old" 8008 mnemonics 
+            cpu 8008new          ; use "new" 8008 mnemonics 
             radix 8              ; use octal for numbers 
  
 CR          EQU 015 
@@ -310,7 +310,6 @@ PAGE3:      DB      "THE GAME STARTS",LF
             DB      "READY TO PLAY. TYPE ANY KEY TO START",LF 
             DB      "THE GAME. GOOD LUCK!",EM 
  
-            cpu 8008new          ; use "new" 8008 mnemonics 
 ;----------------------------------------------------------------------------------------- 
 ; wait for a character from the serial port. do not echo. return the character in A. 
 ; uses A and D. 
@@ -367,8 +366,7 @@ getbit:     mov a,d              ; save the bits in A
 delay:      inr d 
             jnz delay 
             ret 
- 
- 
+  
 ;------------------------------------------------------------------------ 
 ; sends the character in A out from the serial port at 2400 bps. 
 ; uses A and D. 
@@ -407,7 +405,5 @@ putbit:     out 08h              ; output the least significant bit
             ana a                ; timing adjustment 
             rrc                  ; shift A right 
             ret 
- 
-            cpu 8008new          ; return to using "old" 8008 mnemonics 
              
             end 0000H
