@@ -16,7 +16,7 @@
 ; 
 ; serial I/O at 2400 bps N-8-1 
 ;=============================================================================================== 
-           cpu 8008new           ; use "old" 8008 mnemonics 
+           cpu 8008new           ; use "new" 8008 mnemonics 
            radix 8               ; use octal for numbers 
             
            ORG (1*400)+000 
