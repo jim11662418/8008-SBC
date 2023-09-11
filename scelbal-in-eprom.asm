@@ -6,7 +6,7 @@
 ; serial I/O at 2400 bps, N-8-1
 ;
 ; SCELBAL interpreter downloaded from http://www.willegal.net/scelbi/scelbal.html modified
-; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Åke.
+; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Ã…ke.
 ;
 ; modified to run from a 2764 EPROM for my 8008 home-brew single board computer by Jim Loos.   
 ; 
@@ -33,11 +33,6 @@
 
             cpu 8008new             ; use "new" 8008 mnemonics
             radix 10                ; use base 10 for numbers
-
-; pressing the reset pushbutton on the 8008 SBC sets the reset flip-flop which generates
-; an interrupt and clears the address latches. thus, the first instruction is always fetched
-; from address 0. the instruction at address 0 must be a single byte transfer instruction
-; in order to set the program counter correctly. i.e., it must be one of the RST opcodes.
 
             org 2000H               ; beginning of EPROM
             
