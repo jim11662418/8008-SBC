@@ -1,11 +1,49 @@
             PAGE 0             ; suppress page headings in ASW listing file
+;---------------------------------------------------------------------------------------------------------------------------------
+; Copyright 2022 Jim Loos
+;
+; Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files
+; (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge,
+; publish, distribute, sub-license, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do
+; so, subject to the following conditions:
+;
+; The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+;
+; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+; OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+; LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+; IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+;---------------------------------------------------------------------------------------------------------------------------------
             
 ;------------------------------------------------------------------------
-; 2400bps Serial Monitor for 8008 SBC
-; 
-; this version assumes the following memory map:
-; 0000H - 1FFFH:  RAM
-; 2000H - 3FFFH:  EPROM
+; Serial Monitor for 8008 SBC
+;
+; Commands:
+;   B - Binary file download (no error checking)
+;   C - Call subroutine
+;   D - Dump memory
+;   E - Examine/modify memory
+;   F - Fill memory
+;   G - Goto address
+;   H - Intel Hex file download
+;   I - Input from port
+;   J - Jump to address
+;   O - Output to port
+;   S - SCELBAL
+;
+; V2.0 uses 16K of the 32K 27256 EPROM. the Serial Monitor occupies the first 8K of the EPROM. 
+; the Scelbi BASIC Interpreter (SCELBAL) occupies the second 8K of the EPROM. when reset, the SBC
+; starts executing code from the first 8K of EPROM (Monitor). when 'S' is entered at the Monitor's 
+; prompt, the SBC 'bank switches' to select the second 8K of the 27256 EPROM for execution (SCELBAL).
+;
+; assemble both 'monitor.asm' and 'scelbal-in-eprom.asm' with the AS Macro Assembler 
+; (http://john.ccac.rwth-aachen.de:8000/as/). use the assembler's P2BIN utility to generate two 
+; binary files. concatenate the resulting two binary files into one file for your EPROM programmer.
+; one way is to use the DOS 'COPY' command: 'copy /b monitor.bin + scelbal-in-eprom.bin eprom.bin'.
+; I prefer to use the concatenate function in the Freeware Hex Editor 'HxD' by Maël Hörz
+; (https://mh-nexus.de/en/hxd/)
+;
+; serial I/O at 2400 bps N-8-1  
 ;------------------------------------------------------------------------            
 
             include "bitfuncs.inc" 
@@ -26,7 +64,7 @@ ESCAPE      equ 1BH
 RETURN      equ 0DH
 
 ; when the reset pushbutton is pressed, the flip-flop is set which generates an interrupt
-; and clears the address latches thus, the first instruction is thus always fetched from 
+; and clears the address latches. thus, the first instruction is thus always fetched from 
 ; address 0. the instruction at address 0 must be a single byte transfer instruction in 
 ; order to set the program counter. i.e., it must be one of the RST opcodes.
             org 2000H                   ; start of EPROM
@@ -35,13 +73,36 @@ RETURN      equ 0DH
             org 2008H                   ; rst 1 jumps here
             jmp start
             
-start:      in 1                        ; reset the bootstrap flip-flop internal to GAL22V10 #2
+start:      xra a                       ; clear A
+            out 10                      ; clear the EPROM bank switch address outputs A13 and A14
+            out 09                      ; turn off orange LEDs            
             mvi a,1
-            out 08H                     ; set serial output high (mark)
-            xra a
-            out 09H                     ; turn off orange LEDs
+            out 08                      ; set serial output high (mark)
+            in 1                        ; reset the bootstrap flip-flop internal to GAL22V10 #2
+         
+; perform a checksum test of the EPROM by summing the contents of EPROM locations 2000-3FFFH.
+; assuming that the P2BIN utility was run with the 's' option, the sum of all EPROM locations, if
+; read correctly, should be zero.
+            ;xra a                       ; clear A
+            ;mvi h,20H                   ; first EPROM address
+            ;mvi l,00H
+romcksum:   ;add m                       ; add the EPROM contents to A
+            ;inr l                       ; next EPROM address
+            ;jnz romcksum                ; loop back if not finished with this page of the EPROM
+            ;inr h                       ; else, next page of the EPROM
+            ;mov b,a                     ; save the sum in A to B temporarily
+            ;mov a,h
+            ;cpi 40H                     ; has H reached 40H? (the end of the EPROM)
+            ;mov a,b                     ; restore the sum to A from B
+            ;jnz romcksum                ; loop back if not at the end of the EPROM
+            ;ora a                       ; set flags
+            ;jz romcksumOK               ; the sum in A should be zero, jump if the EPROM checksum is OK
+            ;mvi h,hi(epromtxt)          ; else, print the error message and then halt
+            ;mvi l,lo(epromtxt) 
+            ;call puts         
+            ;hlt
             
-            mvi h,hi(esccount)          ; clear the escape key counter
+romcksumOK: mvi h,hi(esccount)          ; clear the escape key counter
             mvi l,lo(esccount) 
             mvi m,0
             
@@ -107,6 +168,8 @@ prompt2:    mvi h,hi(esccount)
             jz jump                     ; jump to address
             cpi 'O'
             jz output                   ; output to port
+            cpi 'S'
+            jz scelbal                  ; jump to SCELBAL
             cpi 0DH
             jz menu                     ; display the menu
             mvi a,'?'
@@ -272,11 +335,12 @@ examine5:   cpi 0DH                     ; enter?
             
 ;------------------------------------------------------------------------
 ; load a binary file into memory using the Tera Term "Send file" function.
+; use this function cautiously as there is, of course, no error checking.
 ; when using the Tera Term "Send file" function, make sure that:
 ;   1. the serial port transmit delay is set to at least 2 msec/char
 ;   2. the "Binary" option check box on the Send File dialog box is checked.
 ; the download is assumed to be finished when no characters have been received
-; from Teraterm for 3 seconds.
+; from Tera Term for 3 seconds.
 ; uses BC as the "idle" counter.
 ;------------------------------------------------------------------------            
 bindl:      mvi h,hi(binloadtxt)  
@@ -403,7 +467,7 @@ finished:   mvi h,hi(loadedtxt)
 cksumerr:   mvi h,hi(errortxt)
             mvi l,lo(errortxt)
             call puts                   ; print "Checksum error."
-            hlt
+            hlt                         ; stay here until reset
 
 ;------------------------------------------------------------------------
 ; get two hex digits from the serial port during the hex download and 
@@ -426,14 +490,14 @@ hexbyte:    call getche             ; get the first character and echo it
             ret
             
 ;------------------------------------------------------------------------
-; go to a memory address
+; go to a memory address (same as Jump to a memory address)
 ;------------------------------------------------------------------------           
 goto:       mvi h,hi(gototxt)
             mvi l,lo(gototxt)
             call puts
             call get_four               ; get the four digit address into HL
             jc prompt                   ; exit if escape            
-            jmp jump1
+            jmp jump1                   ; continue below
             
 ;------------------------------------------------------------------------
 ; jump to a memory address
@@ -505,7 +569,6 @@ input:      mvi h,hi(inputtxt)
             mov a,d
             call write_hex
             call crlf
-            
             jmp prompt
 
 ;------------------------------------------------------------------------            
@@ -540,6 +603,27 @@ output:     mvi h,hi(outputtxt)
             call crlf                 ; start of a new line            
             jmp prompt            
 
+;------------------------------------------------------------------------            
+; load code into RAM which, when executed, will set the bits of output port 10
+; to control the A14 and A13 address lines of the EPROM. when executed, the code
+; in RAM sets the address lines to select the second 8K of EPROM and then jumps
+; to address 2000H which is the start of the SCELBAL BASIC interpreter.
+;------------------------------------------------------------------------            
+scelbal:    mvi h,hi(scelbaltxt)
+            mvi l,lo(scelbaltxt)
+            call puts
+            mvi h,hi(jmp_addr)
+            mvi l,lo(jmp_addr)
+            mvi m,55H                 ; store "OUT 10" instruction at 'jmp_addr'  
+            inr l
+            mvi m,44H                 ; store "JMP" instruction at 'jmp_addr'+1
+            inr l
+            mvi m,00H                 ; store "00H" (the lo byte of address 2000H) at 'jmp_addr'+2
+            inr l
+            mvi m,20H                 ; store "20H" (the hi byte of address 2000H) at 'jmp_addr'+3
+            mvi a,01H                 ; value to clear A14, set A13 to select the second 8K of EPROM
+            jmp jmp_addr              ; go set the address bits and then jump to the beginning SCELBAL in the second 8K of EPROM
+            
 ;------------------------------------------------------------------------            
 ; subroutine to decrement double-byte value in BC
 ;------------------------------------------------------------------------
@@ -776,17 +860,17 @@ prndec8d:   mov a,d
 ; uses A, HL, BC and DE.
 ;------------------------------------------------------------------------        
 prndec16:   mvi b,0         ; clear the leading zero flag
-            mvi d,027H
-            mvi e,010H      ; DE now contains 10000
+            mvi d,hi(10000)
+            mvi e,lo(10000) ; DE now contains 10000
             call subtr      ; count and print the ten thousands digit
-            mvi d,003H
-            mvi e,0E8H      ; DE now contains 1000
+            mvi d,hi(1000)
+            mvi e,lo(1000)  ; DE now contains 1000            
             call subtr      ; count and print the thousands digit
-            mvi d,000H
-            mvi e,064H      ; DE now contains 100
+            mvi d,0
+            mvi e,100       ; DE now contains 100
             call subtr      ; count and print the hundreds digit
-            mvi d,000H
-            mvi e,00AH      ; DE now contains 10
+            mvi d,0
+            mvi e,10        ; DE now contains 10
             call subtr      ; count and print the tens digit
             mov a,l         ; get the units digit
             adi '0'         ; convert the units digit to ascii
@@ -1103,111 +1187,17 @@ puts:       mov a,m
 
 INPORT      equ 0                   ; serial input port address
 OUTPORT     equ 08H                 ; serial output port address
-;------------------------------------------------------------------------        
-; sends the character in A out from the serial port at 2400 bps.
-; uses A and E.
-; for 2400 bps, each bit should be 104 cycles
-;------------------------------------------------------------------------
-putch:      mov e,a                 ; save the character from A to E
-            xra a                   ; clear A for the start bit
-
-            out OUTPORT             ; send the start bit
-            mov a,e                 ; restore the character from E to A 
-            mov a,e                 ; timing
-            mvi e,0FDH              ; timing
-            mvi e,0FDH              ; timing   
-            call delay
-            
-            call putbit             ; transmit bit 0
-            call putbit             ; transmit bit 1
-            call putbit             ; transmit bit 2
-            call putbit             ; transmit bit 3
-            call putbit             ; transmit bit 4
-            call putbit             ; transmit bit 5
-            call putbit             ; transmit bit 6
-            call putbit             ; transmit bit 7            
-
-            ; send the stop bit 
-            mov e,a                 ; save the character from A to E
-            mvi a,1                 ; '1' for the stop bit
-            out OUTPORT             ; send the stop bit 
-            mov a,e                 ; restore the character from E to A
-            mvi e,0FCh              ; timing
-            call delay              ; timing
-            ret                     ; return to caller
-
-putbit:     out OUTPORT             ; output the least significant bit of the sharacter in A
-            mvi e,0FDH              ; timing
-            mvi e,0FDH              ; timing
-            call delay              ; timing
-            rrc                     ; shift the bits of the character in A right
-            ret
-            
 ;-----------------------------------------------------------------------------------------
 ; wait for a character from the serial port. 
-; echo each bit as it is received. return the received character in A.
-; uses A and E.
-;-----------------------------------------------------------------------------------------
-getche:     in INPORT               ; get input from serial port
-            rar                     ; rotate the received serial bit right into carry
-            jc getche               ; jump if start bit not detected (input is high)
-
-            ; start bit detected. wait 52 cycles (1/2 bit time) then send start bit
-            mvi e,0                 ; initialize E
-            mvi e,0                 ; timing
-            xra a                   ; clear the accumulator
-            out OUTPORT             ; send the start bit
-            call delay1             ; timing
-            mvi e,0                 ; timing
-            
-            ; receive and echo bits 0 through 7
-            call getbitecho         ; receive/echo bit 0
-            call getbitecho         ; receive/echo bit 1
-            call getbitecho         ; receive/echo bit 2
-            call getbitecho         ; receive/echo bit 3
-            call getbitecho         ; receive/echo bit 4
-            call getbitecho         ; receive/echo bit 5
-            call getbitecho         ; receive/echo bit 6
-            call getbitecho         ; receive/echo bit 7
-            
-            ; wait 104 cycles, then send the stop bit
-            mov a,e                 ; save the character from E to A
-            mvi e,0FEH              ; timing
-            call delay              ; timing    
-            mov e,a                 ; restore the character from A to E
-            mvi a,1                 ; '1' for the stop bit
-            out OUTPORT             ; send the stop bit
-            ; wait 104 cycles.
-            mov a,e                 ; restore the character from E to A
-            ani 7FH                 ; mask out the most significant bit
-            ;mvi e,0FEH              ; timing
-            ;call delay              ; timing
-            ret                     ; return to caller
-
-getbitecho: mov a,e                 ; save the received bits from E to A
-            mvi e,0FFH              ; timing
-            call delay              ; timing
-            mov e,a                 ; restore the received bits from A to E
-            ana a                   ; timing adjustment
-            in INPORT               ; get input from the serial port
-            out OUTPORT             ; echo the received bit
-            rar                     ; rotate the received bit right into carry
-            mov a,e                 ; restore the previously received bits from E to A
-            rar                     ; rotate the newly received bit in carry right into the MSB of A
-            mov e,a                 ; save the received bits in E
-            ret
-            
-;-----------------------------------------------------------------------------------------
-; wait for a character from the serial port. 
+; receives 1 start bit, 8 data bits and 1 stop bit at 2400 bps.
 ; do not echo. return the character in A.
 ; uses A and E.
-; for 2400 bps, each bit should be 104 cycles
 ;-----------------------------------------------------------------------------------------
 getch:      in INPORT               ; get input from serial port
             rar                     ; rotate the received serial bit right into carry
             jc getch                ; jump if start bit not detected (input is high)
 
-            ; start bit detected. wait 52 cycles (1/2 bit time) then send start bit
+            ; start bit detected. wait 52 cycles (1/2 bit time)
 getch1:     mvi e,0                 ; initialize E
             mvi e,0                 ; timing
             xra a                   ; clear the accumulator
@@ -1249,6 +1239,100 @@ getbit:     mov a,e                 ; save the received bits from E to A
             rar                     ; rotate the newly received bit in carry right into the MSB of A
             mov e,a                 ; save the received bits in E
             ret        
+
+;-----------------------------------------------------------------------------------------
+; wait for a character from the serial port. 
+; receives 1 start bit, 8 data bits and 1 stop bit at 2400 bps.
+; echo each bit as it is received. return the received character in A.
+; uses A and E.
+;-----------------------------------------------------------------------------------------
+getche:     in INPORT               ; get input from serial port
+            rar                     ; rotate the received serial bit right into carry
+            jc getche               ; jump if start bit not detected (input is high)
+
+            ; start bit detected. wait 52 cycles (1/2 bit time) then send start bit
+            mvi e,0                 ; initialize E
+            mvi e,0                 ; timing
+            xra a                   ; clear the accumulator
+            out OUTPORT             ; send the start bit
+            call delay1             ; timing
+            mvi e,0                 ; timing
+            
+            ; receive and echo bits 0 through 7
+            call getbitecho         ; receive/echo bit 0
+            call getbitecho         ; receive/echo bit 1
+            call getbitecho         ; receive/echo bit 2
+            call getbitecho         ; receive/echo bit 3
+            call getbitecho         ; receive/echo bit 4
+            call getbitecho         ; receive/echo bit 5
+            call getbitecho         ; receive/echo bit 6
+            call getbitecho         ; receive/echo bit 7
+            
+            ; wait 104 cycles, then send the stop bit
+            mov a,e                 ; save the character from E to A
+            mvi e,0FEH              ; timing
+            call delay              ; timing    
+            mov e,a                 ; restore the character from A to E
+            mvi a,1                 ; '1' for the stop bit
+            out OUTPORT             ; send the stop bit
+            mov a,e                 ; restore the character from E to A
+            ani 7FH                 ; mask out the most significant bit
+            ;mvi e,0FEH              ; timing
+            ;call delay              ; timing
+            ret
+
+getbitecho: mov a,e                 ; save the received bits from E to A
+            mvi e,0FFH              ; timing
+            call delay              ; timing
+            mov e,a                 ; restore the received bits from A to E
+            ana a                   ; timing adjustment
+            in INPORT               ; get input from the serial port
+            out OUTPORT             ; echo the received bit
+            rar                     ; rotate the received bit right into carry
+            mov a,e                 ; restore the previously received bits from E to A
+            rar                     ; rotate the newly received bit in carry right into the MSB of A
+            mov e,a                 ; save the received bits in E
+            ret
+
+;------------------------------------------------------------------------        
+; sends the character in A out from the serial port.
+; transmits 1 start bit, 8 data bits and 1 stop at 2400 bps.
+; uses A and E.
+;------------------------------------------------------------------------
+putch:      mov e,a                 ; save the character from A to E
+            xra a                   ; clear A for the start bit
+
+            out OUTPORT             ; send the start bit
+            mov a,e                 ; restore the character from E to A 
+            mov a,e                 ; timing
+            mvi e,0FDH              ; timing
+            mvi e,0FDH              ; timing   
+            call delay
+            
+            call putbit             ; transmit bit 0
+            call putbit             ; transmit bit 1
+            call putbit             ; transmit bit 2
+            call putbit             ; transmit bit 3
+            call putbit             ; transmit bit 4
+            call putbit             ; transmit bit 5
+            call putbit             ; transmit bit 6
+            call putbit             ; transmit bit 7            
+
+            ; send the stop bit 
+            mov e,a                 ; save the character from A to E
+            mvi a,1                 ; '1' for the stop bit
+            out OUTPORT             ; send the stop bit 
+            mov a,e                 ; restore the character from E to A
+            mvi e,0FCh              ; timing
+            call delay              ; timing
+            ret
+
+putbit:     out OUTPORT             ; output the least significant bit of the sharacter in A
+            mvi e,0FDH              ; timing
+            mvi e,0FDH              ; timing
+            call delay              ; timing
+            rrc                     ; shift the bits of the character in A right
+            ret
             
 ;------------------------------------------------------------------------        
 ; delay in microseconds = (((255-value in E)*16)+19) * 4 microseconds
@@ -1257,8 +1341,9 @@ delay:      inr e
             jnz delay
 delay1:     ret        
             
+;------------------------------------------------------------------------                    
 titletxt:   db  "\r\r"
-            db  "Serial Monitor for Intel 8008 SBC V1.7\r"
+            db  "Serial Monitor for Intel 8008 SBC V2.0\r"
             db  "Assembled on ",DATE," at ",TIME,"\r",0
 menutxt:    db  "\r"
             db  "B - Binary file download\r"
@@ -1270,7 +1355,8 @@ menutxt:    db  "\r"
             db  "G - Go to address\r"
             db  "I - Input byte from port\r"
             db  "J - Jump to address\r"
-            db  "O - Output byte to port\r",0
+            db  "O - Output byte to port\r"
+            db  "S - SCELBAL\r",0
 
 prompttxt:  db  "\r>>",0
 dumptxt:    db  "ump memory\r",0
@@ -1282,6 +1368,7 @@ gototxt:    db  "o to address: (in hex) ",0
 inputtxt    db  "nput byte from port",0
 outputtxt   db  "utput byte to port",0 
 binloadtxt: db  "inary file download\r",0 
+scelbaltxt: db  "CELBAL\r",0
 hexloadtxt: db  "ex file download\r",0
 addresstxt: db  "\rAddress: (in hex) ",0 
 hcounttxt:  db  "  Count: (in hex) ",0
@@ -1296,3 +1383,8 @@ newvaluetxt:db  "  New: ",0
 porttxt     db  "\rPort address: (in hex) ",0
 bytetxt     db  "\rOutput byte:  (in hex) ",0
 copytxt     db  "\rIntel 8008 SBC Monitor © Copyright 2022 by Jim Loos\r",0
+epromtxt    db "\rEPROM checksum error!\r",0
+
+            db 4000H-$ dup (0)      ; fill the rest of the EPROM space with zeros  
+           
+           end

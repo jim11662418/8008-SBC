@@ -1,19 +1,32 @@
             PAGE 0             ; suppress page headings in AS listing file
-            
 ;------------------------------------------------------------------------
 ;
-; Scelbi Basic Interpreter (SCELBAL) modified for ROM.
+; Scelbi BASIC Interpreter (SCELBAL) modified for ROM.
+;
+; serial I/O at 2400 bps, N-8-1
 ;
 ; SCELBAL interpreter downloaded from http://www.willegal.net/scelbi/scelbal.html modified
-; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Ã…ke.
+; to assemble with the AS Macro Assembler (http://john.ccac.rwth-aachen.de:8000/as/) by Hans-Åke.
 ;
 ; modified to run from a 2764 EPROM for my 8008 home-brew single board computer by Jim Loos.   
+; 
+; SCELBAL Commands:
+; 
+; Immediate-mode only (referred to as "executive" mode in the documentation.):
+;     SCR, LIST, RUN, LOAD, SAVE
+; 
+; Immediate or program mode:
+;     PRINT, INPUT, LET, IF...THEN, IF...GOTO, GOTO, GOSUB...RETURN, FOR...TO...STEP...NEXT, REM, END, DIM
+; 
+; Functions:
+;     INT, SGN, ABS, SQR, RND, CHR, TAB, UDF
 ;
-; the user defined function (UDF) is used to control the red LED on the SBC.
-; UDF is a math function like: INT, SGN, ABS, SQR, TAB, RND or CHR;
-; therefore, the syntax is:
-; A=UDF(1) to turn the red LED on
-; A=UDF(0) to turn the red LED off 
+; the user defined function (UDF) is used to control the orange LEDs connected to port 09.
+; X=UDF(255) turns all the orange LEDs on
+; X=UDF(0)   turns all the orange LEDs off 
+;
+; If using Tera Term's 'Send File' function to download BASIC source code, 
+; set the transmit delay for 2ms/char, 500ms/line
 ;------------------------------------------------------------------------            
             
             include "bitfuncs.inc" 
@@ -25,24 +38,19 @@
 ; an interrupt and clears the address latches. thus, the first instruction is always fetched
 ; from address 0. the instruction at address 0 must be a single byte transfer instruction
 ; in order to set the program counter correctly. i.e., it must be one of the RST opcodes.
-            org 2000h               ; beginning of EPROM
-            rst 1
 
-            org 2008h	            ; rst 1 jumps here
-            jmp start            
+            org 2000H               ; beginning of EPROM
             
-start:      in 1                    ; reset the bootstrap flip-flop internal to GAL22V10 #2
+            xra a                   ; clear A
+            out 09                  ; turn off orange LEDs            
             mvi a,1
-            out 08h                 ; set serial output high (mark)
-            xra a
-            out 09h                 ; turn off the red LED
-            
+            out 08                  ; set serial output high (mark)
             mvi h,hi(titletxt)      ; print the title
             mvi l,lo(titletxt) 
             call puts     
             
 ; copy OLDPG1 constants and variables from EPROM at 3D00H to RAM at 0000H
-            mvi l,00h               ; initialize L to start of page
+            mvi l,00H               ; initialize L to start of page
 mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 3DH
             mov a,m                 ; retrieve the byte from EPROM
             mvi h,hi(OLDPG1)        ; destination: RAM at page 00H
@@ -51,7 +59,7 @@ mv_oldpg1:  mvi h,hi(page1)         ; source: OLDPG1 constants in EPROM at page 
             jnz mv_oldpg1           ; go back if page not complete
 
 ; copy OLDPG26 constants and variables from EPROM at 3E00H to RAM at 0100H            
-            mvi l,00h               ; initialize L to start of page
+            mvi l,00H               ; initialize L to start of page
 mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page 3EH
             mov a,m                 ; retrieve the byte from EPROM
             mvi h,hi(OLDPG26)       ; destination: RAM at page 01H
@@ -60,7 +68,7 @@ mv_oldpg26: mvi h,hi(page26)        ; source: OLDPG26 constants in EPROM at page
             jnz mv_oldpg26          ; go back if page not complete
             
 ; copy OLDPG27 constants and variables from EPROM at 3F00H to RAM at 0200H            
-            mvi l,00h               ; initialize L to start of page
+            mvi l,00H               ; initialize L to start of page
 mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page 3FH
             mov a,m                 ; retrieve the byte from EPROM
             mvi h,hi(OLDPG27)       ; destination: RAM at page 02H
@@ -80,11 +88,12 @@ mv_oldpg27: mvi h,hi(page27)        ; source: OLDPG27 constants in EPROM at page
 ;-----------------------------------------------------------------------------------------
 
 INPORT      equ 0                   ; serial input port address
-OUTPORT     equ 08h                 ; serial output port address
+OUTPORT     equ 08H                 ; serial output port address
 ;-----------------------------------------------------------------------------------------
-; 2400 bps character input subroutine for SCELBAL
+; character input subroutine for SCELBAL
 ; wait for a character from the serial port. 
-; echo the character. return the character in A.
+; receives 1 start bit, 8 data bits and 1 stop bit at 2400 bps.
+; echo each bit as it is received. return the received character in A.
 ; uses A and B.
 ;-----------------------------------------------------------------------------------------
 CINP:       in INPORT               ; get input from serial port
@@ -111,20 +120,25 @@ CINP:       in INPORT               ; get input from serial port
             
             ; wait 1 bit time, then send the stop bit
             mov a,b                 ; save the character from B to A
-            mvi b,0feh              ; timing adjustment
+            mvi b,0FEH              ; timing adjustment
             call delay              ; timing adjustment
             mov b,a                 ; restore the chararacter from A to B
             mvi a,1                 ; '1' for stop bit
             out OUTPORT             ; send the stop bit
             ; wait 1 bit time
             mov a,b                 ; restore the character from B to A
-            mvi b,0feh              ; timing adjustment
+            mvi b,0FEH              ; timing adjustment
             call delay              ; timing adjustment
-            ori 80h                 ; SCELBAL needs to have the most significant bit set
+;           cpi 'a'                 ; is the input character below 'a'? 
+;           jc $+10                 ; skip the next three instructions if the character is already upper case
+;           cpi '{'                 ; is the input character '{' or above?
+;           jnc $+5                 ; if so, skip the next instruction
+;           sui 20H                 ; else, convert to the character to upper case
+            ori 80H                 ; SCELBAL needs to have the most significant bit set
             ret                     ; return to caller
 
 getbitecho: mov a,b                 ; save the received bits from B to A
-            mvi b,0ffh              ; timing adjustment
+            mvi b,0FFH              ; timing adjustment
             call delay              ; timing adjustment
             mov b,a                 ; restore the received bits from A to B
             ana a                   ; timing adjustment
@@ -137,18 +151,20 @@ getbitecho: mov a,b                 ; save the received bits from B to A
             ret
             
 ;------------------------------------------------------------------------        
-; 2400 bps character output subroutine for SCELBAL
+; character output subroutine for SCELBAL
+; sends the character in A out from the serial port.
+; transmits 1 start bit, 8 data bits and 1 stop at 2400 bps.
 ; uses A and B.
 ; returns with the original character in A
 ;------------------------------------------------------------------------
-CPRINT:     ani 7fh                 ; mask off the most significant bit of the character
+CPRINT:     ani 7FH                 ; mask off the most significant bit of the character
             mov b,a                 ; save the character from A to B
             xra a                   ; clear A for the start bit
-            out 08h                 ; send the start bit
+            out OUTPORT             ; send the start bit
             mov a,b                 ; restore the character from B to A 
             mov a,b                 ; timing adjustment
-            mvi b,0fdh              ; timing adjustment
-            mvi b,0fdh              ; timing adjustment        
+            mvi b,0FDH              ; timing adjustment
+            mvi b,0FDH              ; timing adjustment        
             call delay              ; timing adjustment
             
             ; send bits 0 through 7
@@ -164,16 +180,16 @@ CPRINT:     ani 7fh                 ; mask off the most significant bit of the c
             ; send the stop bit 
             mov b,a                 ; save the character from A to B
             mvi a,1                 ; '1' for the stop bit
-            out 08h                 ; send the stop bit 
+            out OUTPORT             ; send the stop bit 
             mov a,b                 ; restore the original character from B to A
-            ori 80h                 ; restore the most significant bit of the character
-            mvi b,0fch              ; timing adjustment
+            ori 80H                 ; restore the most significant bit of the character
+            mvi b,0FCH              ; timing adjustment
             call delay              ; timing adjustment
             ret                     ; return to caller
 
-putbit:     out 08h                 ; output the least significant bit of the character in A
-            mvi b,0fdh              ; timing adjustment
-            mvi b,0fdh              ; timing adjustment
+putbit:     out OUTPORT             ; output the least significant bit of the character in A
+            mvi b,0FDH              ; timing adjustment
+            mvi b,0FDH              ; timing adjustment
             call delay              ; timing adjustment
             rrc                     ; shift the character in A right
             ret
@@ -184,6 +200,19 @@ putbit:     out 08h                 ; output the least significant bit of the ch
 delay:      inr b
             jnz delay
 delay1:     ret
+
+;------------------------------------------------------------------------        
+; serially print the null terminated string whose address is in HL.
+; uses A and B and HL      
+;------------------------------------------------------------------------
+puts:       mov a,m
+            ana a
+            rz                      ; return if end of string
+            call CPRINT
+            inr l                   ; next character
+            jnz puts
+            inr h
+            jmp puts            
             
             cpu 8008                ; use "old" mneumonics for SCELBAL
             RADIX 8                 ; use octal for numbers
@@ -245,11 +274,11 @@ delay1:     ret
 ;;; I can't vouch for ALL references to these pages in
 ;;; the code being switched to these labels, but they
 ;;; seem to be.
-	
-OLDPG1		EQU	0000H             ; originally at 0100H, now relocated to 0000H - jsl  
-OLDPG26	    EQU	0100H             ; originally at 1600H, now relocated to 0100H - jsl 
-OLDPG27	    EQU	0200H             ; originally at 1700H, now relocated to 0200H - jsl 
-OLDPG57	    EQU	0300H             ; originally at 2F00H, now relocated to 0300H - jsl
+    
+OLDPG1      EQU 0000H             ; originally at 0100H, now relocated to 0000H - jsl  
+OLDPG26     EQU 0100H             ; originally at 1600H, now relocated to 0100H - jsl 
+OLDPG27     EQU 0200H             ; originally at 1700H, now relocated to 0200H - jsl 
+OLDPG57     EQU 0300H             ; originally at 2F00H, now relocated to 0300H - jsl
 
 BGNPGRAM    EQU 04H               ; originally user program buffer began at 1B00H, now begins at 0400H - jsl
 ENDPGRAM    EQU 20H               ; originally user program buffer ended at 2CFFH, now ends at 1FFFH   - jsl  
@@ -515,7 +544,7 @@ ECHO:      LDH                    ;Save entry value of H in register D
            LLE                    ;Restore entry value of L from E
            RET                    ;Return to calling routine
            
-CINPUT:	   JMP CINP               ;Reference to user defined input subroutine
+CINPUT:    JMP CINP               ;Reference to user defined input subroutine
 
 EVAL:      LLI 227                ;Load L with address of ARITHMETIC STACK pointer
            LHI OLDPG1/400         ;** Set H to page of ARITHMETIC STACK pointer
@@ -585,7 +614,7 @@ SCAN7:     CPI 251                ;See if character fetched from expression is
            LLI 176                ;If yes, load L with address of PARSER TOKEN
            LMI 007                ;Set PARSER TOKEN value to reflect ")"
            CAL PARSER             ;Call the  PARSER subroutine to process current symbol
-	
+    
            CAL PRIGHT             ;Call subroutine to handle FUNCTION or ARRAY
            LLI 230                ;Load L with address of FUN/ARRAY STACK pointer
            LHI OLDPG26/400        ;** Set H to page of FUN/ARRAY STACK pointer
@@ -1260,7 +1289,7 @@ NOLIST:    LLI 342                ;Load L with address of RUN in look up table
 ;;;        LMI 001                ;The count of one into it. Now change the memory pntr
 ;;; Apparently, in Page 3 of Issue 4 of Scelbal update (1/77) they say the above should change.
 ;;; This makes the SCR command clear the whole variable space, otherwise one space is lost.
-	       LMI 000
+           LMI 000
            LLI 075                ;To storage location for number of dimensioned arrays
            LMI 000                ;@@ And initialize to zero. (@@ = Substitute NOPs if
            LLI 120                ;@@ DIMension capability not used in package.) Also
@@ -1365,10 +1394,10 @@ GETAU2:    LLI 360                ;Reset mem pntr to pgm buffer line pntr storag
            JFZ NOTEND             ;If not zero continue processing. If zero have reached
            JMP NOSAME             ;End of buffer contents so go APPEND line to buffer.
 
-PATCH3:	   LLI 201		          ; ptr to A/V storage
+PATCH3:    LLI 201                ; ptr to A/V storage
            LHI OLDPG27/400
-	       LMI 000		          ; clear A/V flag
-	       JMP EXEC
+           LMI 000                ; clear A/V flag
+           JMP EXEC
 
 NOTEND:    LLI 350                ;Load L with addr of auxiliary line number storage loc
            LHI OLDPG26/400        ;Load H with addr of aux line number storage loc
@@ -1530,7 +1559,7 @@ FINERR:    LLI 340                ;Load L with starting address of line number s
            LHI OLDPG26/400        ;** Area and do same for CPU register H
            CAL TEXTC              ;Call subroutine to display the line number
 FINER1:    CAL CRLF               ;Call subroutine to provide a carriage-return and line-feed
-	       JMP PATCH3 
+           JMP PATCH3 
        
 ;;; The following is the old code, before patch 3
 ;;;        JMP EXEC               ;To the display device then return to EXECUTIVE.
@@ -1885,7 +1914,7 @@ GOTO1:     LLI 203                ;Load L with address of GOTO pointer
 GOTO2:     LLI 203                ;Reset pointer to GOTO pointer storage location
            CAL LOOP               ;Advance the pointer value and test for end of line
            JFZ GOTO1              ;If not end of line, fetch next digit in GOTO line number
-GOTO3:	   LLI 360                ;Set L to user program buffer pointer storage location
+GOTO3:     LLI 360                ;Set L to user program buffer pointer storage location
            LHI OLDPG26/400        ;** Set H to page of program buffer pointer
            LMI BGNPGRAM           ;Initialize high part of pointer to start of pgm buffer
            INL                    ;Advance the memory point
@@ -2350,8 +2379,8 @@ MOROP:     LLI 137                ;Set pointer to FPOP Exponent.
 ;;; The below two instructions are changed by PATCH NR.1
 ;;;SHACOP: LLI 123                ;Set pointer to FPACC LSW minus one to provide extra
 ;;;        LMI 000                ;Byte for addition ops. Clear that location to zero.
-SHACOP:	   CAL PATCH1		      ; patch 1 inserts a few lines at 30-000
-	       LAA
+SHACOP:    CAL PATCH1             ; patch 1 inserts a few lines at 30-000
+           LAA
 ;;;        LLI 133
 ;;;        LMI 000                ;THIS IS PATCH #1
            LLI 127                ;Change pointer to FPACC Exponent
@@ -2447,7 +2476,7 @@ MULTIP:    LLI 126                ;Set pointer to MSW of FPACC mantissa
            LDH                    ;Of the multiplication results
            LLI 143                ;From the partial-product location
            LBI 004                ;To the FPACC
-	
+    
 EXMLDV:    CAL MOVEIT             ;Perform the transfer from p-p to FPACC
            LBI 000                ;Set up CPU register B to indicate regular normalization
            CAL FPNORM             ;Normalize the result of multiplication
@@ -3212,7 +3241,7 @@ TOMUCH:    LAI 260                ;Load base ASCII value for digit into the accu
            RET                    ;Finished outputting. Return to caller.
            
 ;;; The following is PATCH NR.1
-PATCH1:	   LLI 123
+PATCH1:    LLI 123
            LMI 000
            LLI 133
            LMI 000
@@ -3433,7 +3462,7 @@ BACKSP:    LAI 215                ;Load ASCII code for carriage-return into the 
            RTS                    ;Negative or zero
            RTZ                    ;In which case return to caller
            JMP TAB1               ;Else, proceed to perform the TAB operation.
-	
+    
 FOR5:      LLI 205                ;Load L with address of the FOR/NEXT STACK pointer
            LHI OLDPG27/400        ;** Load H with page of the FOR/NEXT STACK pntr
            LAM                    ;Fetch the stack pointer to the ACC.
@@ -3458,7 +3487,7 @@ PARSEP:    LLI 176                ;Load L with PARSER TOKEN storage location. Se
            CPI 230                ;Should indicate only one value (answer) in stack.
            RTZ                    ;Exit with answer in FPACC if ARITH STACK is O.K.
            JMP SYNERR             ;Else have a syntax error!
-	
+    
 SQRX:      LLI 014                ;Load L with address of FP TEMP registers
            LHI OLDPG1/400         ;** Set H to page of FP TEMP. Move contents of FPACC
            CAL FSTORE             ;[Argument of SQR(X)] into FP TEMP for storage.
@@ -3526,12 +3555,12 @@ SQRLOP:    LLI 034                ;Load L with address of SQR APPROX working reg
 ;;; following is the original code
 ;;;        JTS SQRCNV             ;If so, approximation has converged
 ;;; Now is the new line
-	       JMP PATCH2
+           JMP PATCH2
 ;;;;       DCL
 ;;;;       LAM
 ;;;;       NDA
 ;;;;       JTZ SQRCNV             ;THIS IS PATCH #2
-SQR1:	   LLI 034                ;Else, load L with address of SQR APPROX
+SQR1:      LLI 034                ;Else, load L with address of SQR APPROX
            LDH                    ;Set D to same page as H
            LEI 044                ;And E with address of LAST SQR APPROX
            LBI 004                ;Set up register B as a number of bytes to move counter
@@ -3585,12 +3614,12 @@ RNDX:      LLI 064                ;Load L with address of SEED storage registers
            RET                    ;0.0 and +1.0 and exit to calling routine
 
 ;;; following is PATCH 2
-PATCH2:	  JTS SQRCNV
-	      DCL
-	      LAM
-	      NDA
-	      JTZ SQRCNV
-	      JMP SQR1
+PATCH2:   JTS SQRCNV
+          DCL
+          LAM
+          NDA
+          JTZ SQRCNV
+          JMP SQR1
        
 ;; OPTIONAL ARRAY ROUTINES
 PRIGH1:    LLI 126                ;Load L with address of the MSW in the FPACC
@@ -3648,11 +3677,11 @@ FUNAR3:    LLI 202                ;Load L with address of TEMP COUNTER
            SBM                    ;COUNTER from zero to obtain two's complement.
            LMA                    ;Place this back in counter location as ARRAY TOKEN
            JMP FUNAR4             ;VALUE (negative). Go place the value on F/A STACK.
-	
+    
 OUTRNG:    LAI 317                ;Load the ASCII code for letter 0 into the accumulator
            LCI 322                ;Load the ASCII code for letter R into register C
            JMP ERROR              ;Go display Out of Range (OR) error message.
-	
+    
 ARRAY:     CAL RESTSY             ;Transfer contents of AUX SYMBOL BUFFER into the
            JMP ARRAY2             ;SYMBOL BUFFER. (Entry when have actual LET)
 ARRAY1:    LLI 202                ;Load L with address of SCAN pointer
@@ -3856,107 +3885,88 @@ DIMERR:    LAI 304                ;On error condition, load ASCII code for lette
            LCI 305                ;And ASCII code for letter E in CPU register C
            JMP ERROR              ;Go display the Dirnension Error (DE) message.
 
-; user defined functions:
+; user defined function:
 ; UDF is a math function like: INT, SGN, ABS, SQR, TAB, RND or CHR;
 ; therefore, the syntax is:
-; A=UDF(1) turns the red LED on
-; A=UDF(0) turns the red LED off
+; A=UDF(255) to turn all the orange LEDs on
+; A=UDF(0)   to turn all the orange LEDs off 
 
-           cpu 8008new             ; use "new" 8008 mnemonics
-UDEFX:	   call FPFIX             ; convert the contents of FPACC from floating point to fixed point  
+           cpu 8008new            ; use "new" 8008 mnemonics
+UDEFX:     call FPFIX             ; convert the contents of FPACC from floating point to fixed point  
            mvi l,54h              ; load L with the address of the LSW of the fixed point value  
            mov a,m                ; fetch the byte into the accumulator
-           out 09h                ; odd arguments for UDF turn the red LED on, even arguments turn the red LED off
+           out 09h                ; output the byte to port 09 to control the LEDs
            ret
-           cpu 8008               ; return to using "old" mneumonics
+           cpu 8008               ; return to using "old" 8008 mneumonics
 
-save:	
-load:	   JMP EXEC		            ; By default, save and load isn't implemented.
+save:   
+load:      JMP EXEC               ; By default, save and load aren't implemented.
 
-            cpu 8008new             ; use "new" 8008 mnemonics
-            radix 10                ; use base 10 for numbers
-
-;------------------------------------------------------------------------        
-; serially print the null terminated string whose address is in HL.
-; uses A and B and HL      
-;------------------------------------------------------------------------
-puts:       mov a,m
-            ana a
-            rz                      ; return if end of string
-            call CPRINT
-            inr l                   ; next character
-            jnz puts
-            inr h
-            jmp puts            
-            
 titletxt:   db  "\n\nIntel 8008 Single Board Computer\n"
             db  "Scelbi BASIC (SCELBAL) Interpreter\n"
             db  "Assembled on ",DATE," at ",TIME,"\n"
             db  "Portions copyright 2021 by Jim Loos\n\n"   
             db  "Type \"SCR\" to clear and initialize program space\n\n",0
 
-            cpu 8008                ; use "old" mneumonics for SCELBAL
-            RADIX 8                 ; use octal for numbers
-
-;this page gets copied from EPROM to RAM at 0000H as OLDPG1           
+;this page gets copied from EPROM to RAM at 0000H as OLDPG1 - jsl          
             ORG 3D00H
 page1:      DB 000,000,000,000
-            DB 000,000,100,001	        ; STORES FLOATING POINT CONSTANT +1.0
+            DB 000,000,100,001          ; STORES FLOATING POINT CONSTANT +1.0
             DB 000,000,000
-            DB 000		                ; EXPONENT COUNTER
-            DB 000,000,000,000	        ; STORES FLOATING POINT NUMBER TEMPORARILLY
+            DB 000                      ; EXPONENT COUNTER
+            DB 000,000,000,000          ; STORES FLOATING POINT NUMBER TEMPORARILLY
             DB 000,000,000,000
-            DB 000,000,300,001	        ; STORES FLOATING POINT CONSTANT -1.0
-            DB 000,000,000,000	        ; SCRATCH PAD AREA (16 BYTES)
-            DB 000,000,000,000
-            DB 000,000,000,000
-            DB 000,000,000,000
-            DB 001,120,162,002	        ; STORES RANDOM NUMBER GENERATOR CONSTANT VALUE
-            DB 000,000,000,000
-            DB 003,150,157,014	        ; STORES RANDOM NUMBER GENERATOR CONSTANT VALUE
-            DB 000,000,000,000	        ; SCRATCH PAD AREA (12 BYTES) (01 064-077)
+            DB 000,000,300,001          ; STORES FLOATING POINT CONSTANT -1.0
+            DB 000,000,000,000          ; SCRATCH PAD AREA (16 BYTES)
             DB 000,000,000,000
             DB 000,000,000,000
-            DB 000,000		            ; SIGN INDICATOR
-            DB 000			            ; BITS COUNTER
-            DB 000,000		            ; SIGN INDICATOR
-            DB 000		                ; INPUT DIGIT COUNTER
-            DB 000		                ; TEMP STORAGE
-            DB 000		                ; OUTPUT DIGIT COUNTER
-            DB 000 		                ; FP MODE INDICATOR
+            DB 000,000,000,000
+            DB 001,120,162,002          ; STORES RANDOM NUMBER GENERATOR CONSTANT VALUE
+            DB 000,000,000,000
+            DB 003,150,157,014          ; STORES RANDOM NUMBER GENERATOR CONSTANT VALUE
+            DB 000,000,000,000          ; SCRATCH PAD AREA (12 BYTES) (01 064-077)
+            DB 000,000,000,000
+            DB 000,000,000,000
+            DB 000,000                  ; SIGN INDICATOR
+            DB 000                      ; BITS COUNTER
+            DB 000,000                  ; SIGN INDICATOR
+            DB 000                      ; INPUT DIGIT COUNTER
+            DB 000                      ; TEMP STORAGE
+            DB 000                      ; OUTPUT DIGIT COUNTER
+            DB 000                      ; FP MODE INDICATOR
             DB 000,000,000,000,000,000,000  ; NOT ASSIGNED
-            DB 000,000,000,000	        ; FPACC EXTENSION
-            DB 000,000,000,000	        ; FPACC LSW, NSW, MSW, EXPONENT
-            DB 000,000,000,000	        ; FPOP  Extension
-            DB 000,000,000,000	        ; FPOP  LSW, NSW, MSW, EXPONENT
-            DB 000,000,000,000	        ; FLOATING POINT WORKING AREA
-            DB 000,000,000,000	        
+            DB 000,000,000,000          ; FPACC EXTENSION
+            DB 000,000,000,000          ; FPACC LSW, NSW, MSW, EXPONENT
+            DB 000,000,000,000          ; FPOP  Extension
+            DB 000,000,000,000          ; FPOP  LSW, NSW, MSW, EXPONENT
+            DB 000,000,000,000          ; FLOATING POINT WORKING AREA
+            DB 000,000,000,000          
             DB 000,000,000,000
             DB 000,000,000,000
             DB 000,000,000,000
             DB 000,000,000,000
             DB 000,000,000,000,000,000,000,000  ; 8 Bytes NOT ASSIGNED
-            DB 000,000,000,000	        ; TEMPORARY REGISTER STORAGE AREA (D,E,H&L)
+            DB 000,000,000,000          ; TEMPORARY REGISTER STORAGE AREA (D,E,H&L)
             DB 000,000,000,000          ;  NOT ASSIGNED
-            DB 000,000,120,004	        ; STORES FLOATING POINT CONSTANT +10.0
-            DB 147,146,146,375	        ; STORES FLOATING POINT CONSTANT +0.1
-            DB 000			            ; GETINP COUNTER
+            DB 000,000,120,004          ; STORES FLOATING POINT CONSTANT +10.0
+            DB 147,146,146,375          ; STORES FLOATING POINT CONSTANT +0.1
+            DB 000                      ; GETINP COUNTER
             DB 000,000,000,000,000,000  ; NOT ASSIGNED 
-            DB 000			            ; ARITHMETIC STACK POINTER (01 227)
-            DB 000			            ; ARITHMETIC STACK (NOT CLEAR HOW LONG)
+            DB 000                      ; ARITHMETIC STACK POINTER (01 227)
+            DB 000                      ; ARITHMETIC STACK (NOT CLEAR HOW LONG)
             db 21h dup 0
-            DB 004			            ; CC FOR SAVE
+            DB 004                      ; CC FOR SAVE
             DB 'S'+200
             DB 'A'+200
             DB 'V'+200
             DB 'E'+200
-            DB 004			            ; CC FOR LOAD
+            DB 004                      ; CC FOR LOAD
             DB 'L'+200
             DB 'O'+200
             DB 'A'+200
             DB 'D'+200
-            DB 000,000,000,000	        ; UNCLEAR WHAT THIS IS (01 304-01 317) ZEROS
-            DB 000,000,000,000	        ; (PROBABLY STEP, FOR/NEXT, AND ARRAY PTR TEMP)
+            DB 000,000,000,000          ; UNCLEAR WHAT THIS IS (01 304-01 317) ZEROS
+            DB 000,000,000,000          ; (PROBABLY STEP, FOR/NEXT, AND ARRAY PTR TEMP)
             DB 000,000,000,000
             DB 4
             DB 'T'+200
@@ -3984,14 +3994,14 @@ page1:      DB 000,000,000,000
             DB 'S'+200
             DB 'C'+200
             DB 'R'+200
-            DB 013		                ; CC FOR "READY" MESSAGE
-            DB 224,215,212	            ; CTRL-T, CARRIAGE RETURN, LINE FEED
+            DB 013                      ; CC FOR "READY" MESSAGE
+            DB 224,215,212              ; CTRL-T, CARRIAGE RETURN, LINE FEED
             DB 'R'+200
             DB 'E'+200
             DB 'A'+200
             DB 'D'+200
             DB 'Y'+200
-            DB 215,212,212	            ; CARRIAGE RETURN, LINE FEED, LINE FEED;
+            DB 215,212,212              ; CARRIAGE RETURN, LINE FEED, LINE FEED;
             DB 011
             DB ' '+200
             DB 'A'+200
@@ -4003,217 +4013,215 @@ page1:      DB 000,000,000,000
             DB 'E'+200
             DB ' '+200        
             
-;this page gets copied from EPROM to RAM at 0100H as OLDPG26            
+;this page gets copied from EPROM to RAM at 0100H as OLDPG26 - jsl          
            ORG 3E00H
-page26:    DB 000			    ; CC FOR INPUT LINE BUFFER
-           DB 117 dup 0 		; 79 Bytes THE INPUT LINE BUFFER
-	       DB 000,000,000,000	; THESE ARE SYMBOL BUFFER STORAGE
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000	; THESE LOCATIONS ARE AUXILIARY SYMBOL BUFFER
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000
-	       DB 000		        ; TEMP SCAN STORAGE REGISTER
-	       DB 000		        ; TAB FLAG
-	       DB 000		        ; EVAL CURRENT TEMP REG.
-	       DB 000		        ; SYNTAX LINE NUMBER
-	       DB 000		        ; SCAN TEMPORARY REGISTER
-	       DB 000		        ; STATEMENT TOKEN
-	       DB 000,000		    ; TEMPORARY WORKING REGISTERS
-	       DB 000,000		    ; ARRAY POINTERS
-	       DB 000		        ; OPERATOR STACK POINTER
-	       DB 17 dup 0	        ; 15 Bytes OPERATOR STACK
-	       DB 000		        ; FUN/ARRAY STACK POINTER
-	       DB 7 dup 0	        ; FUNCTION/ARRAY STACK
+page26:    DB 000               ; CC FOR INPUT LINE BUFFER
+           DB 117 dup 0         ; 79 Bytes THE INPUT LINE BUFFER
+           DB 000,000,000,000   ; THESE ARE SYMBOL BUFFER STORAGE
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000   ; THESE LOCATIONS ARE AUXILIARY SYMBOL BUFFER
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000
+           DB 000               ; TEMP SCAN STORAGE REGISTER
+           DB 000               ; TAB FLAG
+           DB 000               ; EVAL CURRENT TEMP REG.
+           DB 000               ; SYNTAX LINE NUMBER
+           DB 000               ; SCAN TEMPORARY REGISTER
+           DB 000               ; STATEMENT TOKEN
+           DB 000,000           ; TEMPORARY WORKING REGISTERS
+           DB 000,000           ; ARRAY POINTERS
+           DB 000               ; OPERATOR STACK POINTER
+           DB 17 dup 0          ; 15 Bytes OPERATOR STACK
+           DB 000               ; FUN/ARRAY STACK POINTER
+           DB 7 dup 0           ; FUNCTION/ARRAY STACK
 
-	       ;; HEIRARCHY TABLE (FOR OUT OF STACK OPS) USED BY PARSER ROUTINE.
-	       DB 000		        ; EOS
-	       DB 003		        ; PLUS SIGN
-	       DB 003		        ; MINUS SIGN
-	       DB 004		        ; MULTIPLICATION SIGN
-	       DB 004		        ; DIVISION SIGN
-	       DB 005		        ; EXPONENT SIGN
-	       DB 006		        ; LEFT PARENTHESIS
-	       DB 001		        ; RIGHT PARENTHESIS
-	       DB 002		        ; NOT ASSIGNED
-	       DB 002		        ; LESS THAN SIGN
-	       DB 002		        ; Equal sign
-	       DB 002		        ; GREATER THAN SIGN
-	       DB 002		        ; LESS THAN OR EQUAL COMBO
-	       DB 002		        ; EQUAL OR GREATER THAN
-	       DB 002		        ; LESS THAN OR GREATER THAN
+           ;; HEIRARCHY TABLE (FOR OUT OF STACK OPS) USED BY PARSER ROUTINE.
+           DB 000               ; EOS
+           DB 003               ; PLUS SIGN
+           DB 003               ; MINUS SIGN
+           DB 004               ; MULTIPLICATION SIGN
+           DB 004               ; DIVISION SIGN
+           DB 005               ; EXPONENT SIGN
+           DB 006               ; LEFT PARENTHESIS
+           DB 001               ; RIGHT PARENTHESIS
+           DB 002               ; NOT ASSIGNED
+           DB 002               ; LESS THAN SIGN
+           DB 002               ; Equal sign
+           DB 002               ; GREATER THAN SIGN
+           DB 002               ; LESS THAN OR EQUAL COMBO
+           DB 002               ; EQUAL OR GREATER THAN
+           DB 002               ; LESS THAN OR GREATER THAN
 
-	       ;; HEIRARCHY TABLE (FOR INTO STACK OPS)
-	       ;; USED BY PARSER ROUTINE.
-	       DB 000		        ; EOS
-	       DB 003		        ; PLUS SIGN
-	       DB 003		        ; MINUS SIGN
-	       DB 004		        ; MULTIPLICATION SIGN
-	       DB 004		        ; DIVISION SIGN
-	       DB 005		        ; EXPONENTIATION SIGN
-	       DB 001		        ; LEFT PARENTHESIS
-	       DB 001		        ; RIGHT PARENTHESIS
-	       DB 002		        ; NOT ASSIGNED
-	       DB 002		        ; LESS THAN SIGN
-	       DB 002		        ; EQUAL SIGN
-	       DB 002		        ; GREATER THAN SIGN
-	       DB 002		        ; LESS THAN OR EQUAL SIGN
-	       DB 002		        ; EQUAL TO OR GREATER THAN
-	       DB 002		        ; LESS THAN OR GREATER THAN
-	       DB 000		        ; EVAL START POINTER
-	       DB 000		        ; EVAL FINISH POINTER
+           ;; HEIRARCHY TABLE (FOR INTO STACK OPS)
+           ;; USED BY PARSER ROUTINE.
+           DB 000               ; EOS
+           DB 003               ; PLUS SIGN
+           DB 003               ; MINUS SIGN
+           DB 004               ; MULTIPLICATION SIGN
+           DB 004               ; DIVISION SIGN
+           DB 005               ; EXPONENTIATION SIGN
+           DB 001               ; LEFT PARENTHESIS
+           DB 001               ; RIGHT PARENTHESIS
+           DB 002               ; NOT ASSIGNED
+           DB 002               ; LESS THAN SIGN
+           DB 002               ; EQUAL SIGN
+           DB 002               ; GREATER THAN SIGN
+           DB 002               ; LESS THAN OR EQUAL SIGN
+           DB 002               ; EQUAL TO OR GREATER THAN
+           DB 002               ; LESS THAN OR GREATER THAN
+           DB 000               ; EVAL START POINTER
+           DB 000               ; EVAL FINISH POINTER
 
-	       ;; FUNCTION NAMES TABLE
-	       DB 3
-	       DB 'I'+200
-	       DB 'N'+200
-	       DB 'T'+200
-	       DB 3
-	       DB 'S'+200
-	       DB 'G'+200
-	       DB 'N'+200
-	       DB 3
-	       DB 'A'+200
-	       DB 'B'+200
-	       DB 'S'+200
-	       DB 3
-	       DB 'S'+200
-	       DB 'Q'+200
-	       DB 'R'+200
-	       DB 3
-	       DB 'T'+200
-	       DB 'A'+200
-	       DB 'B'+200
-	       DB 3
-	       DB 'R'+200
-	       DB 'N'+200
-	       DB 'D'+200
-	       DB 3
-	       DB 'C'+200
-	       DB 'H'+200
-	       DB 'R'+200
-	       DB 3
-	       DB 'U'+200
-	       DB 'D'+200
-	       DB 'F'+200
-	       DB 000,000,000,000	; LINE NUMBER BUFFER STORAGE
-	       DB 000,000,000,000
-	       DB 000,000,000,000	; AUX LINE NUMBER BUFFER
-	       DB 000,000,000,000
+           ;; FUNCTION NAMES TABLE
+           DB 3
+           DB 'I'+200
+           DB 'N'+200
+           DB 'T'+200
+           DB 3
+           DB 'S'+200
+           DB 'G'+200
+           DB 'N'+200
+           DB 3
+           DB 'A'+200
+           DB 'B'+200
+           DB 'S'+200
+           DB 3
+           DB 'S'+200
+           DB 'Q'+200
+           DB 'R'+200
+           DB 3
+           DB 'T'+200
+           DB 'A'+200
+           DB 'B'+200
+           DB 3
+           DB 'R'+200
+           DB 'N'+200
+           DB 'D'+200
+           DB 3
+           DB 'C'+200
+           DB 'H'+200
+           DB 'R'+200
+           DB 3
+           DB 'U'+200
+           DB 'D'+200
+           DB 'F'+200
+           DB 000,000,000,000   ; LINE NUMBER BUFFER STORAGE
+           DB 000,000,000,000
+           DB 000,000,000,000   ; AUX LINE NUMBER BUFFER
+           DB 000,000,000,000
           
           ;;; The following DB is a change in page 3 of Scelbal update issue 4
           ;;; which apparently makes the "INSERT" command work correctly, the
           ;;; first time (later SCR commands load 33 into this spot) 
-	       DB 033 		        ; USER PGM LINE PTR (PG)
-	       DB 000 		        ; USER PGM LINE PTR (LOW)
-	       DB 000 		        ; AUX PGM LINE PTR (PG)
-	       DB 000 		        ; AUX PGM LINE PTR (LOW)
-	       DB 000 		        ; END OF USER PGM BUFFER PTR (PG)
-	       DB 000 		        ; END OF USER PGM BUFFER PTR (LOW)
-	       DB 000		        ; PARENTHESIS COUNTER (366)
-	       DB 000		        ; QUOTE INDICATOR
-	       DB 000		        ; TABLE COUNTER (370)
+           DB 033               ; USER PGM LINE PTR (PG)
+           DB 000               ; USER PGM LINE PTR (LOW)
+           DB 000               ; AUX PGM LINE PTR (PG)
+           DB 000               ; AUX PGM LINE PTR (LOW)
+           DB 000               ; END OF USER PGM BUFFER PTR (PG)
+           DB 000               ; END OF USER PGM BUFFER PTR (LOW)
+           DB 000               ; PARENTHESIS COUNTER (366)
+           DB 000               ; QUOTE INDICATOR
+           DB 000               ; TABLE COUNTER (370)
            db 0,0,0,0,0,0,0
            
-;this page gets copied from EPROM to RAM at 0200H as OLDPG27           
-	       ORG 3F00H
+;this page gets copied from EPROM to RAM at 0200H as OLDPG27 - jsl           
+           ORG 3F00H
 page27:    DB 3
-	       DB 'R'+200
-	       DB 'E'+200
-	       DB 'M'+200
-	       DB 2
-	       DB 'I'+200
-	       DB 'F'+200
-	       DB 3
-	       DB 'L'+200
-	       DB 'E'+200
-	       DB 'T'+200
-	       DB 4
-	       DB 'G'+200
-	       DB 'O'+200
-	       DB 'T'+200
-	       DB 'O'+200
-	       DB 5
-	       DB 'P'+200
-	       DB 'R'+200
-	       DB 'I'+200
-	       DB 'N'+200
-	       DB 'T'+200
-	       DB 5
-	       DB 'I'+200
-	       DB 'N'+200
-	       DB 'P'+200
-	       DB 'U'+200
-	       DB 'T'+200
-	       DB 3
-	       DB 'F'+200
-	       DB 'O'+200
-	       DB 'R'+200
-	       DB 4
-	       DB 'N'+200
-	       DB 'E'+200
-	       DB 'X'+200
-	       DB 'T'+200
-	       DB 5
-	       DB 'G'+200
-	       DB 'O'+200
-	       DB 'S'+200
-	       DB 'U'+200
-	       DB 'B'+200
-	       DB 6
-	       DB 'R'+200
-	       DB 'E'+200
-	       DB 'T'+200
-	       DB 'U'+200
-	       DB 'R'+200
-	       DB 'N'+200
-	       DB 3
-	       DB 'D'+200
-	       DB 'I'+200
-	       DB 'M'+200
-	       DB 3
-	       DB 'E'+200
-	       DB 'N'+200
-	       DB 'D'+200
-	       DB 0			        ; END OF TABLE
+           DB 'R'+200
+           DB 'E'+200
+           DB 'M'+200
+           DB 2
+           DB 'I'+200
+           DB 'F'+200
+           DB 3
+           DB 'L'+200
+           DB 'E'+200
+           DB 'T'+200
+           DB 4
+           DB 'G'+200
+           DB 'O'+200
+           DB 'T'+200
+           DB 'O'+200
+           DB 5
+           DB 'P'+200
+           DB 'R'+200
+           DB 'I'+200
+           DB 'N'+200
+           DB 'T'+200
+           DB 5
+           DB 'I'+200
+           DB 'N'+200
+           DB 'P'+200
+           DB 'U'+200
+           DB 'T'+200
+           DB 3
+           DB 'F'+200
+           DB 'O'+200
+           DB 'R'+200
+           DB 4
+           DB 'N'+200
+           DB 'E'+200
+           DB 'X'+200
+           DB 'T'+200
+           DB 5
+           DB 'G'+200
+           DB 'O'+200
+           DB 'S'+200
+           DB 'U'+200
+           DB 'B'+200
+           DB 6
+           DB 'R'+200
+           DB 'E'+200
+           DB 'T'+200
+           DB 'U'+200
+           DB 'R'+200
+           DB 'N'+200
+           DB 3
+           DB 'D'+200
+           DB 'I'+200
+           DB 'M'+200
+           DB 3
+           DB 'E'+200
+           DB 'N'+200
+           DB 'D'+200
+           DB 0                 ; END OF TABLE
 
-	       DB 000			    ; GOSUB STACK POINTER
-	       DB 000		        ; NOT ASSIGNED;
-	       DB 000			    ; NUMBER OF ARRAYS COUNTER
-	       DB 000			    ; ARRAY POINTER
-	       DB 000			    
-	       DB 000,000,000,000	; USED AS THE GOSUB STACK
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000	; USED AS ARRAY VARIABLES TABLE
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
+           DB 000               ; GOSUB STACK POINTER
+           DB 000               ; NOT ASSIGNED;
+           DB 000               ; NUMBER OF ARRAYS COUNTER
+           DB 000               ; ARRAY POINTER
+           DB 000               
+           DB 000,000,000,000   ; USED AS THE GOSUB STACK
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000   ; USED AS ARRAY VARIABLES TABLE
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
 
-	       DB 000,000,000,000	; USED FOR FOR/NEXT STACK STORAGE
-	       DB 000,000,000,000	; SHOULD BE 140 TO 177
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000,000,000,000
-	       DB 000		        ; FOR/NEXT STACK POINTER
-	       DB 000		        ; ARRAY/VARIABLE FLAG
-	       DB 000  		        ; STOSYM COUNTER
-	       DB 000		        ; FUN/ARRAY STACK POINTER (203
-	       DB 000		        ; ARRAY VALUES POINTER
-	       DB 3 dup 0	        ; NOT USED (SHOULD BE 205-207)
-	       DB 000		        ; USED AS VARIABLES SYMBOL TABLE
-	       DB 167 dup 0	        ; 119 Bytes (SHOULD BE 211-377 RESERVED)
-           
-           radix 10             ; return to using base 10
-           cpu 8008new          ; return to using new 8008 mnemonics           
-        
+           DB 000,000,000,000   ; USED FOR FOR/NEXT STACK STORAGE
+           DB 000,000,000,000   ; SHOULD BE 140 TO 177
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000,000,000,000
+           DB 000               ; FOR/NEXT STACK POINTER
+           DB 000               ; ARRAY/VARIABLE FLAG
+           DB 000               ; STOSYM COUNTER
+           DB 000               ; FUN/ARRAY STACK POINTER (203
+           DB 000               ; ARRAY VALUES POINTER
+           DB 3 dup 0           ; NOT USED (SHOULD BE 205-207)
+           DB 000               ; USED AS VARIABLES SYMBOL TABLE
+           DB 167 dup 0         ; 119 Bytes (SHOULD BE 211-377 RESERVED)
+
+           end
