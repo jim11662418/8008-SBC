@@ -38,14 +38,14 @@ Pin 14 = DBD;       /* 74LS245 Data Bus Direction control   */
 /*  $ = XOR                         */
 
 /* states */
-t1      = !S2 &  S1 & !S0;      /* lower 8 bits of address out              */
-t1i     =  S2 &  S1 & !S0;      /* CPU interrupted                          */
-t2      =  S2 & !S1 & !S0;      /* higher 6 bits address, 2 bits control out*/    
-wait    = !S2 & !S1 & !S0;      /* external memory not ready                */
-t3      = !S2 & !S1 &  S0;      /* instruction or data fetch or data out    */
-stopped = !S2 &  S1 &  S0;      /* halt instruction received by CPU         */
-t4      =  S2 &  S1 &  S0;      /* execution of instruction                 */
-t5      =  S2 & !S1 &  S0;      /* execution of instruction                 */
+t1      = !S2 &  S1 & !S0;      /* lower 8 bits of address out               */
+t1i     =  S2 &  S1 & !S0;      /* CPU interrupted                           */
+t2      =  S2 & !S1 & !S0;      /* higher 6 bits address, 2 bits control out */    
+wait    = !S2 & !S1 & !S0;      /* external memory not ready                 */
+t3      = !S2 & !S1 &  S0;      /* instruction or data fetch or data out     */
+stopped = !S2 &  S1 &  S0;      /* halt instruction received by CPU          */
+t4      =  S2 &  S1 &  S0;      /* execution of instruction                  */
+t5      =  S2 & !S1 &  S0;      /* execution of instruction                  */
 
 !RUNNING = !stopped;
 

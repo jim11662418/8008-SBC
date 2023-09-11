@@ -17,6 +17,8 @@ Pin 5  = A11;
 Pin 6  = A12;
 Pin 7  = A13;
 Pin 8  = RESET;
+Pin 9  = Q3;             /* Q3 output from 74LS75  (output port 10 bit 1) */
+Pin 10 = Q2;             /* Q2 output from 74LS75  (output port 10 bit 0) */
 
 /* Outputs:  */
 Pin 23 = OUTP0;
@@ -24,8 +26,11 @@ Pin 22 = INP0;
 Pin 21 = OUTP1;
 Pin 20 = INP1;
 Pin 19 = START;
+Pin 18 = OUTP2;
 Pin 17 = ROMCS;
 Pin 16 = RAMCS;
+Pin 15 = ROMA14;          /* to EPROM address input A14 (for bank switching) */
+Pin 14 = ROMA13;          /* to EPROM address input A13 (for bank switching) */          
 
 /* Input/Output logic: */
 in0  = !A13 & !A12;
@@ -61,3 +66,10 @@ START = !RESET # (START & INP1);
 /* Memory   */
 !ROMCS =  A13 #  START;     /* 2000-3FFFH           */
 !RAMCS = !A13 & !START;  	/* 0000-1FFFH           */
+
+/* when START is high (on power-up and reset), ROMA14 and ROMA13 are low to force the SBC to execute code   */
+/* in the first 8K segment of the EPROM. when START is low, ROMA14 and ROMA13 are controlled  by the Q3 and */ 
+/* Q2 inputs from port 10 allowing any one of the four 8K sections of the EPROM to be selected for code.    */
+ROMA14 = !START & Q3;         /* output to EPROM address line A14 */
+ROMA13 = !START & Q2;         /* output to EPROM address line A13 */
+
